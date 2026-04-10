@@ -15,8 +15,8 @@ int main()
 	Texture background;
 	background.loadFromFile("background.png");
 
-	Sprite/*指可移动图像*/b1(background);
-	Sprite/*指可移动图像*/b2(background);
+	Sprite b1(background);
+	Sprite b2(background);
 	b1.setTextureRect(IntRect(0, 0, 256, 384));
 	b2.setTextureRect(IntRect(0, 0, 256, 384));
 	int backgroudMove = 0;
@@ -24,8 +24,8 @@ int main()
 	Texture pipe;
 	pipe.loadFromFile("pipe.png");
 
-	Sprite/*指可移动图像*/upPipe(pipe);
-	Sprite/*指可移动图像*/downPipe(pipe);
+	Sprite upPipe(pipe);
+	Sprite downPipe(pipe);
 	upPipe.setTextureRect(IntRect(0, 0, 60, 384));
 	downPipe.setTextureRect(IntRect(0, 0, 60, 384));
 	int pipeMove = 0;
@@ -42,8 +42,6 @@ int main()
 
 	int upPipeArea= 20 + rand() % 200;
 	int downPipeArea= upPipeArea+100;
-	//int upPipeArea = 50;
-	//int downPipeArea = upPipeArea + 100;
 
 	int birdHeight = 128 - 24;
 	int birdx = 68 + 34;
