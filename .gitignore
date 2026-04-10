@@ -1,0 +1,120 @@
+# ----- Qt/Qt Creator 相关 -----
+*.pro.user
+*.pro.user.*
+*.autosave
+*pro
+
+# 编译目录（影子构建）
+build-*/
+*.build/
+*.qmake.stash
+
+# Qt Creator 的配置文件夹
+.qtc/
+
+# ----- Visual Studio 相关 -----
+## 由VS自动生成的文件
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.slnx
+*.suo
+*.sdf
+*.opensdf
+*.db
+*.tlog
+*.log
+*.idb
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.pch
+
+## VS 解决方案和项目目录
+.vs/
+x64/
+x86/
+Debug/
+Release/
+Win32/
+#[Cc]ache/
+*.aps
+
+# ----- VSCode 相关 -----
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ----- 跨平台 C++ 编译输出和中间文件 -----
+# 可执行文件和库
+*.exe
+*.out
+*.app
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.ttf
+*.png
+*.txt
+
+# 编译中间文件
+*.o
+*.obj
+*.ko
+
+# CMake（如果你用了）
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+_deps/ # 存放通过FetchContent等下载的依赖
+
+# 跨平台通用忽略
+[Dd]ebug*/
+[Rr]elease*/
+[Ll]ogs/
+[Tt]emp/
+
+# ----- 操作系统自动生成的文件 -----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ----- 你的游戏项目可能产生的临时/输出文件 -----
+# 假设你的可执行程序或游戏数据输出在这里
+[Bb]in/
+[Oo]bj/
+[Oo]utput/
+[Gg]ame[Rr]esults/
+[Ss]aves/
+*.save
+*.log
+*.2c54410
+
+# --- 新增规则 ---
+# IDE/构建系统生成的特定文件
+*.slnx
+*project.json
+*project.json.user
+*.idx
+
+# Qt/qmake 自动生成的 Makefile 变体
+Makefile.Debug
+Makefile.Release
+
+# 通常，直接忽略所有 Makefile（因为它们也能被自动生成）
+# 如果你有手写的、需要共享的Makefile，请使用 `!Makefile` 来排除此规则
+# Makefile
+*.json
