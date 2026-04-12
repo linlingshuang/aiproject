@@ -1,28 +1,31 @@
-﻿#include <SFML/Graphics.hpp>
+﻿﻿#include <SFML/Graphics.hpp>
 #include <string>
+#include <cstdlib>
+#include <random>
 #include "Matrix.h"
 #include "NeuralNetwork.h"
 using namespace sf;
 
-float g = 1.2;
+float g = 1.4;
 
 int geverty(int v,int t) {
 	return v + g * t;
 }
 void selection(vector<float> score, vector<NeuralNetwork> bird) {
-	int maxNum = 0;
-	int maxScore = score[0];
-	for (int i = 0; i < 10; i++) {
-		if (score[i] >= maxScore) {
-			maxScore = score[i];
-			maxNum = i;
-		}
+	// 基于适应度选择前5个最好的小鸟
+	vector<pair<float, int>> scoreIndex;
+	for (int i = 0; i < 100; i++) {
+		scoreIndex.push_back({score[i], i});
 	}
-	bird[maxNum].saveModel(3, 0);
-	bird[0].saveModel(3, 1);
-	bird[2].saveModel(3, 2);
-	bird[4].saveModel(3, 3);
-	bird[6].saveModel(3, 4);
+	// 按得分降序排序
+	sort(scoreIndex.begin(), scoreIndex.end(), [](const pair<float, int>& a, const pair<float, int>& b) {
+		return a.first > b.first;
+	});
+	// 保存前25个最好的小鸟
+	for (int i = 0; i < 25; i++) {
+		bird[scoreIndex[i].second].saveModel(3, i);
+	}
+
 }
 
 int main()
@@ -215,8 +218,8 @@ int main()
 				}
 				backgroudMove += 2;
 				pipeMove += 4;
-				if (backgroudMove == 256 * scale)backgroudMove = 0;
-				if (pipeMove == (256 + 60) * scale) {
+				if (backgroudMove >= 256 * scale)backgroudMove = 0;
+				if (pipeMove >= (256 + 60) * scale) {
 					upPipeArea = (20 + rand() % 200) * scale;
 					downPipeArea = upPipeArea + 100 * scale;
 					pipeMove = 0;
@@ -270,23 +273,24 @@ int main()
 		}
 	}
 	else {
+		int birdNum = 100;
 		bool trainStart = false;
-		vector<NeuralNetwork> bird(10);
-		for (int i = 0; i < 10; i++) {
+		vector<NeuralNetwork> bird(birdNum);
+		for (int i = 0; i < birdNum; i++) {
 			bird[i].initNet(3);
 		}
-		vector<Matrix> birdState(10);
-		vector<Sprite>birds(10);
-		vector<bool> pass(10);
+		vector<Matrix> birdState(birdNum);
+		vector<Sprite>birds(birdNum);
+		vector<bool> pass(birdNum);
 		bool AllBirdDead = false;
-		vector<bool> birdDead(10);
-		vector<int> state(10);
-		vector<int> birdHeights(10);
-		vector<int> birdxs(10);
-		vector<int> v(10);
-		vector<int> datalX(10),datalYup(10),datalYdowm(10);
-		vector<float> score(10);
-		for (int i = 0; i < 10; i++) {
+		vector<bool> birdDead(birdNum);
+		vector<int> state(birdNum);
+		vector<int> birdHeights(birdNum);
+		vector<int> birdxs(birdNum);
+		vector<int> v(birdNum);
+		vector<int> datalX(birdNum),datalYup(birdNum),datalYdowm(birdNum);
+		vector<float> score(birdNum);
+		for (int i = 0; i < birdNum; i++) {
 			birds[i] = Sprite(text);
 			birds[i].setTextureRect(IntRect(0, 0, 34, 24));	
 			birds[i].setScale(scale, scale);
@@ -294,16 +298,24 @@ int main()
 			birdDead[i] = false;
 
 			birdxs[i] = (68 + 34) * scale;
-			birdHeights[i]= (128 - 24) * scale;
+			birdHeights[i]= (384/2 - 24) * scale;
 			v[i]=0;
 			datalX[i] = 256 * scale - pipeMove - birdxs[i];
 			datalYup[i]= birdHeights[i] - upPipeArea;
 			datalYdowm[i]= downPipeArea - (birdHeights[i] + 24 * scale);
-			birdState[i].setValue(0, 0, 0.01*birdHeights[i]);
-			birdState[i].setValue(1, 0, 0.1*v[i]);
-			birdState[i].setValue(2, 0, 0.01*datalX[i]);
-			birdState[i].setValue(3, 0, 0.01*datalYup[i]);
-			birdState[i].setValue(4, 0, 0.01*datalYdowm[i]);
+			// 初始状态归一化
+			float normalizedHeight = (birdHeights[i] / (384.0 * scale - 24.0 * scale)) * 2.0 - 1.0;
+			float normalizedVelocity = v[i] / 20.0 + 10;
+			float normalizedDistance = datalX[i] / (256.0 * scale);
+			float normalizedUpDistance = datalYup[i] / (100.0 * scale);
+			float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
+			birdState[i] = Matrix(5, 0, 0);
+			birdState[i].setValue(1, 1, normalizedHeight);
+			birdState[i].setValue(2, 1, normalizedVelocity);
+			birdState[i].setValue(3, 1, normalizedDistance);
+			birdState[i].setValue(4, 1, normalizedUpDistance);
+			birdState[i].setValue(5, 1, normalizedDownDistance);
+			//birdState[i].show();
 		}
 
 		while (window.isOpen())
@@ -330,51 +342,38 @@ int main()
 							break;
 						}
 					}
-					if (AllBirdDead) {
-						if (gameEvent.key.code == Keyboard::W) {
-							AllBirdDead = false;	trainStart = false;
-							flyup = true;
-							upPipeArea = (20 + rand() % 200) * scale;
-							downPipeArea = upPipeArea + 100 * scale;
-
-							backgroudMove = 0;	pipeMove = 0;
-
-							for (int i = 0; i < 10; i++) {
-								state[i] = 0;
-								birdDead[i] = false;
-								birdxs[i] = (68 + 34) * scale;
-								birdHeights[i] = (128 - 24) * scale;
-								v[i] = 0;
-								datalX[i] = 256 * scale - pipeMove - birdxs[i];
-								datalYup[i] = birdHeights[i] - upPipeArea;
-								datalYdowm[i] = downPipeArea - (birdHeights[i] + 24 * scale);
-								birdState[i].setValue(0, 0, 0.01 * birdHeights[i]);
-								birdState[i].setValue(1, 0, 0.1 * v[i]);
-								birdState[i].setValue(2, 0, 0.01 * datalX[i]);
-								birdState[i].setValue(3, 0, 0.01 * datalYup[i]);
-								birdState[i].setValue(4, 0, 0.01 * datalYdowm[i]);
-							}
-						}
-						else {
-							break;
-						}
-					}
 				}
 			}
 			if (AllBirdDead) {
-				tickTime = 0;
-				window.clear(Color::White);
-				b1.setPosition(0 - backgroudMove, 0);
-				window.draw(b1);
-				b2.setPosition(256 * scale - backgroudMove, 0);
-				window.draw(b2);
-				downPipe.setPosition(256 * scale - pipeMove, downPipeArea);
-				window.draw(downPipe);
-				upPipe.setPosition(256 * scale - pipeMove + 60 * scale, upPipeArea);
-				window.draw(upPipe);
-				window.draw(textGameOver);
-				window.display();
-				continue;
+
+				AllBirdDead = false;	
+				flyup = true;
+				upPipeArea = (20 + rand() % 200) * scale;
+				downPipeArea = upPipeArea + 100 * scale;
+
+				backgroudMove = 0;	pipeMove = 0;
+
+				for (int i = 0; i < birdNum; i++) {
+					state[i] = 0;
+					birdDead[i] = false;
+					birdxs[i] = (68 + 34) * scale;
+					birdHeights[i] = (384 / 2 - 24) * scale;
+					v[i] = 0;
+					datalX[i] = 256 * scale - pipeMove - birdxs[i];
+					datalYup[i] = birdHeights[i] - upPipeArea;
+					datalYdowm[i] = downPipeArea - (birdHeights[i] + 24 * scale);
+					// 重新开始时的状态归一化
+					float normalizedHeight = (birdHeights[i] / (384.0 * scale - 24.0 * scale)) * 2.0 - 1.0;
+					float normalizedVelocity = v[i] / 20.0 + 10;
+					float normalizedDistance = datalX[i] / (256.0 * scale);
+					float normalizedUpDistance = datalYup[i] / (100.0 * scale);
+					float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
+					birdState[i].setValue(0, 0, normalizedHeight);
+					birdState[i].setValue(1, 0, normalizedVelocity);
+					birdState[i].setValue(2, 0, normalizedDistance);
+					birdState[i].setValue(3, 0, normalizedUpDistance);
+					birdState[i].setValue(4, 0, normalizedDownDistance);
+				}
 			}
 			if (!trainStart) {
 				tickTime = 0;
@@ -389,7 +388,7 @@ int main()
 			if (tickTime > delay) {
 				tickTime = 0;
 				if (flyup) {
-					for (int i = 0; i < 10; i++) {
+					for (int i = 0; i < birdNum; i++) {
 						if (birdDead[i]) {
 							continue;
 						}
@@ -399,12 +398,13 @@ int main()
 							flyup = false;
 							v[i] = geverty(v[i], 1);
 							birdHeights[i] += v[i];
-							score[i] += 0.01;
+							
 						}
+						//score[i] += 0.01;
 					}
 				}
 				else {
-					for (int i = 0; i < 10; i++) {
+					for (int i = 0; i < birdNum; i++) {
 						if (birdDead[i]) {
 							continue;
 						}
@@ -414,14 +414,15 @@ int main()
 							flyup = true;
 							v[i] = geverty(v[i], 1);
 							birdHeights[i] += v[i];
-							score[i] += 0.01;
+							
 						}
+						//score[i] += 0.01;
 					}
 				}
 				backgroudMove += 2;
 				pipeMove += 4;
-				if (backgroudMove == 256 * scale)backgroudMove = 0;
-				if (pipeMove == (256 + 60) * scale) {
+				if (backgroudMove >= 256 * scale)backgroudMove = 0;
+				if (pipeMove >= (256 + 60) * scale) {
 					upPipeArea = (20 + rand() % 200) * scale;
 					downPipeArea = upPipeArea + 100 * scale;
 					pipeMove = 0;
@@ -430,7 +431,7 @@ int main()
 					}
 				}
 			}
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < birdNum; i++) {
 				if (birdDead[i]) {
 					continue;
 				}
@@ -438,7 +439,7 @@ int main()
 			}
 			if (aiTime > 0.25) {
 				aiTime = 0;
-				for (int i = 0; i < 10; i++) {
+				for (int i = 0; i < birdNum; i++) {
 					int choice = bird[i].play(birdState[i]);
 					if (choice == 1) {
 						v[i] -= 10;
@@ -447,16 +448,7 @@ int main()
 					cout << "bird" << i << " choose " << choice << endl;
 				}
 			}
-			for (int i = 0; i < 10; i++) {
-				if (birdDead[i]) {
-					continue;
-				}
-				birdState[i].setValue(0, 0, 0.01 * birdHeights[i]);
-				birdState[i].setValue(1, 0, 0.1 * v[i]);
-				birdState[i].setValue(2, 0, 0.01 * datalX[i]);
-				birdState[i].setValue(3, 0, 0.01 * datalYup[i]);
-				birdState[i].setValue(4, 0, 0.01 * datalYdowm[i]);
-			}
+
 
 			window.clear(Color::White);
 			b1.setPosition(0 - backgroudMove, 0);
@@ -468,7 +460,7 @@ int main()
 			upPipe.setPosition(256 * scale - pipeMove + 60 * scale, upPipeArea);
 			window.draw(upPipe);
 
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < birdNum; i++) {
 				if (birdDead[i]) {
 					continue;
 				}
@@ -479,41 +471,49 @@ int main()
 				if ((datalYdowm[i] <= 0 || datalYup[i] <= 0) && (datalX[i] <= 0 && 0 - 34 * scale <= datalX[i] + 60 * scale)) {
 					state[i] = 3;
 					birdDead[i] = true;
-					score[i] -= 1000;
+					score[i] -= 10;
 				}
 				if (birdHeights[i] <= 0 || birdHeights[i] >= 384 * scale - 24 * scale) {
 					state[i] = 3;
 					birdDead[i] = true;
-					score[i] -= 1000;
+					score[i] -= 10;
 				}
 				if (!pass[i] && (birdxs[i] - 34 * scale >= 256 * scale - pipeMove + 60 * scale)) {
 					pass[i] = true;
 					score[i]++;
 				}
 
+				// 优化状态输入的缩放方式
+				// 归一化到 -1 到 1 范围
+				float normalizedHeight = (birdHeights[i] / (384.0 * scale - 24.0 * scale)) * 2.0 - 1.0;
+				float normalizedVelocity = v[i] / 20.0 + 10;
+				float normalizedDistance = datalX[i] / (256.0 * scale);
+				float normalizedUpDistance = datalYup[i] / (100.0 * scale);
+				float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
+
+				birdState[i].setValue(0, 0, normalizedHeight);
+				birdState[i].setValue(1, 0, normalizedVelocity);
+				birdState[i].setValue(2, 0, normalizedDistance);
+				birdState[i].setValue(3, 0, normalizedUpDistance);
+				birdState[i].setValue(4, 0, normalizedDownDistance);
+
 				birds[i].setTextureRect(IntRect(34 * state[i], 0, 34, 24)); // 矩形范围
 				birds[i].setPosition(birdxs[i] - 34 * scale, birdHeights[i]);
 				window.draw(birds[i]);
 			}
 			int count = 0;
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < birdNum; i++) {
 				if (birdDead[i]) {
 					count++;
 				}
 			}
-			if (count == 10) {
+			if (count == birdNum) {
 				AllBirdDead = true;
 				selection(score, bird);
-				bird[0].crossoverAndmutation(3, 0, 1);
-				bird[1].crossoverAndmutation(3, 1, 2);
-				bird[2].crossoverAndmutation(3, 2, 3);
-				bird[3].crossoverAndmutation(3, 4, 0);
-				bird[4].crossoverAndmutation(3, 0, 2);
-				bird[5].crossoverAndmutation(3, 0, 3);
-				bird[6].crossoverAndmutation(3, 2, 1);
-				bird[7].crossoverAndmutation(3, 3, 1);
-				bird[8].crossoverAndmutation(3, 4, 1); 
-				bird[9].crossoverAndmutation(3, 2, 4);
+				srand(std::time(0));
+				for (int i = 0; i < birdNum; i++) {
+					bird[i].crossoverAndmutation(3, rand() % 25, (rand() % 25 + 3) % 25);
+				}
 			}
 			window.display();
 

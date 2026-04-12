@@ -1,6 +1,6 @@
-﻿#pragma once
+﻿﻿#pragma once
 #pragma execution_character_set("utf-8")
-#include<filesystem>
+#include <filesystem>
 #include <fstream>
 #include <vector>
 #include <string>
@@ -77,7 +77,7 @@ public:
 		// 假设网络结构：输入层 -> 隐藏层 -> 输出层
 		layerNeuron[0] = Matrix(5, 1, 0.0);        // 输入层
 		layerNeuron[1] = Matrix(30, 1, 0.0);          // 隐藏层（可调整）
-		layerNeuron[2] = Matrix(2, 1, 0.0);            // 输出层
+		layerNeuron[2] = Matrix(1, 1, 0.0);            // 输出层
 		// 初始化权重（使用 Xavier 初始化）
 		for (int i = 0; i < layerNum - 1; i++) {
 			initWeights(i);
@@ -87,10 +87,10 @@ public:
 	void initWeights(int layerIdx, bool random = true) {
 		int n_in = layerNeuron[layerIdx].getrowNum();
 		int n_out = layerNeuron[layerIdx + 1].getrowNum();
-		double limit = sqrt(6.0 / (n_in + n_out)) - 10;  // Xavier均匀分布范围
+		double limit = sqrt(6.0 / (n_in + n_out));  // Xavier均匀分布范围
 		weights[layerIdx] = Matrix(n_out, n_in, 0.0);
 		if (random) {
-			srand(time(0) + layerIdx);  // 不同层不同种子
+			srand(time(0) + layerIdx + rand());  // 不同层不同种子，增加随机性
 			for (int r = 0; r < n_out; r++) {
 				for (int c = 0; c < n_in; c++) {
 					double val = (rand() / (double)RAND_MAX) * 2 * limit - limit;  // [-limit, limit]
@@ -112,22 +112,22 @@ public:
 	int play(Matrix birdState) {
 		layerNeuron[0] = birdState;
 		for (int i = 0; i < layerNum - 1; i++) {
+			//layerNeuron[i].show();
 			Matrix z = multiplication(weights[i], layerNeuron[i]);
-			z = addition(z, bias[i]);  // 加上偏置
+			z = addition(z, bias[i]);
+			//z.show();
 			if (i == layerNum - 2) {
-				layerNeuron[i + 1] = softmax(z);
+				// 输出层使用 sigmoid，只输出一个值
+				layerNeuron[i + 1] = sigmoid(z);
 			}
 			else {
 				layerNeuron[i + 1] = sigmoid(z);
 			}
 		}
-		cout << endl << layerNeuron[2].getVectorD()[0][0] << ' ' << layerNeuron[2].getVectorD()[0][1] << endl;
-		if (layerNeuron[2].getVectorD()[0][0] <= layerNeuron[2].getVectorD()[0][1]) {
-			return 1;
-		}
-		else {
-			return 0;
-		}
+		double output = layerNeuron[2].getVectorD()[0][0];
+		cout << "output: " << output << endl;
+		// 概率大于 0.5 则跳跃
+		return (output > 0.5) ? 1 : 0;
 	}
 	void saveModel(int llayerNum, int birdnum) {
 		for (int i = 0; i <= llayerNum - 2; i++) {
@@ -148,13 +148,11 @@ public:
 		}
 	}
 	void loadModel(int llayerNum, int birdnum) {
-
 		for (int i = 0; i <= llayerNum - 2; i++) {
 			string fileName = "bird" + to_string(birdnum) + "weight" + to_string(i) + ".txt";
 			ifstream inWeightsFile;
 			double w;
 			inWeightsFile.open(fileName);
-			srand(time(0));  
 			for (int k = 0; k < weights[i].getrowNum(); k++) {
 				for (int j = 0; j < weights[i].getcolumnNum(); j++) {
 					inWeightsFile >> w;
@@ -163,7 +161,6 @@ public:
 			}
 			inWeightsFile.close();
 		}
-
 	}
 	void crossoverAndmutation(int llayerNum, int birdnum1, int birdnum2) {
 		for (int i = 0; i <= llayerNum - 2; i++) {
@@ -180,7 +177,19 @@ public:
 
 					inWeightsFile1 >> w1;
 					inWeightsFile2 >> w2;
-					weights[i].setValue(k + 1, j + 1, (0.5 * w1 + 0.5 * w2) + 0.8 * (rand() % 2));
+					// 交叉：取两个父代的平均值
+					double crossedValue = 0.5 * w1 + 0.5 * w2;
+					// 变异：添加高斯噪声
+					double mutationRate = 0.4;      // 每个权重变异概率
+					double mutationStrength = 0.8;  // 变异强度
+					if (rand() / (double)RAND_MAX < mutationRate) {
+						// 生成高斯噪声
+						double u1 = rand() / (double)RAND_MAX;
+						double u2 = rand() / (double)RAND_MAX;
+						double z = sqrt(-2.0 * log(u1)) * cos(2.0 * 3.1415926535 * u2);
+						crossedValue += z * mutationStrength;
+					}
+					weights[i].setValue(k + 1, j + 1, crossedValue);
 				}
 			}
 			inWeightsFile1.close();
