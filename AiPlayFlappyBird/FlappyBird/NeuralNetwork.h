@@ -1,4 +1,4 @@
-﻿﻿#pragma once
+﻿#pragma once
 #pragma execution_character_set("utf-8")
 #include <filesystem>
 #include <fstream>
@@ -162,6 +162,76 @@ public:
 			inWeightsFile.close();
 		}
 	}
+	// 均匀交叉函数
+	void uniformCrossover(int llayerNum, int birdnum1, int birdnum2) {
+		for (int i = 0; i <= llayerNum - 2; i++) {
+			string fileName1 = "bird" + to_string(birdnum1) + "weight" + to_string(i) + ".txt";
+			ifstream inWeightsFile1;
+			string fileName2 = "bird" + to_string(birdnum2) + "weight" + to_string(i) + ".txt";
+			ifstream inWeightsFile2;
+			double w1;
+			double w2;
+			inWeightsFile1.open(fileName1);
+			inWeightsFile2.open(fileName2);
+			for (int k = 0; k < weights[i].getrowNum(); k++) {
+				for (int j = 0; j < weights[i].getcolumnNum(); j++) {
+					inWeightsFile1 >> w1;
+					inWeightsFile2 >> w2;
+					// 均匀交叉：50%概率从父代1取值，否则从父代2取值
+					double crossedValue = (rand() / (double)RAND_MAX < 0.5) ? w1 : w2;
+					// 变异：添加高斯噪声
+					double mutationRate = 0.1;      // 每个权重变异概率
+					double mutationStrength = 0.1;  // 变异强度
+					if (rand() / (double)RAND_MAX < mutationRate) {
+						// 生成高斯噪声
+						double u1 = rand() / (double)RAND_MAX;
+						double u2 = rand() / (double)RAND_MAX;
+						double z = sqrt(-2.0 * log(u1)) * cos(2.0 * 3.1415926535 * u2);
+						crossedValue += z * mutationStrength;
+					}
+					weights[i].setValue(k + 1, j + 1, crossedValue);
+				}
+			}
+			inWeightsFile1.close();
+			inWeightsFile2.close();
+		}
+	}
+
+	// 算术交叉函数
+	void arithmeticCrossover(int llayerNum, int birdnum1, int birdnum2, double alpha = 0.5) {
+		for (int i = 0; i <= llayerNum - 2; i++) {
+			string fileName1 = "bird" + to_string(birdnum1) + "weight" + to_string(i) + ".txt";
+			ifstream inWeightsFile1;
+			string fileName2 = "bird" + to_string(birdnum2) + "weight" + to_string(i) + ".txt";
+			ifstream inWeightsFile2;
+			double w1;
+			double w2;
+			inWeightsFile1.open(fileName1);
+			inWeightsFile2.open(fileName2);
+			for (int k = 0; k < weights[i].getrowNum(); k++) {
+				for (int j = 0; j < weights[i].getcolumnNum(); j++) {
+					inWeightsFile1 >> w1;
+					inWeightsFile2 >> w2;
+					// 算术交叉：alpha * w1 + (1 - alpha) * w2
+					double crossedValue = alpha * w1 + (1 - alpha) * w2;
+					// 变异：添加高斯噪声
+					double mutationRate = 0.1;      // 每个权重变异概率
+					double mutationStrength = 0.1;  // 变异强度
+					if (rand() / (double)RAND_MAX < mutationRate) {
+						// 生成高斯噪声
+						double u1 = rand() / (double)RAND_MAX;
+						double u2 = rand() / (double)RAND_MAX;
+						double z = sqrt(-2.0 * log(u1)) * cos(2.0 * 3.1415926535 * u2);
+						crossedValue += z * mutationStrength;
+					}
+					weights[i].setValue(k + 1, j + 1, crossedValue);
+				}
+			}
+			inWeightsFile1.close();
+			inWeightsFile2.close();
+		}
+	}
+
 	void crossoverAndmutation(int llayerNum, int birdnum1, int birdnum2) {
 		for (int i = 0; i <= llayerNum - 2; i++) {
 			string fileName1 = "bird" + to_string(birdnum1) + "weight" + to_string(i) + ".txt";

@@ -1,4 +1,4 @@
-﻿﻿#include <SFML/Graphics.hpp>
+﻿#include <SFML/Graphics.hpp>
 #include <string>
 #include <cstdlib>
 #include <random>
@@ -11,6 +11,44 @@ float g = 1.4;
 int geverty(int v,int t) {
 	return v + g * t;
 }
+// 锦标赛选择函数
+int tournamentSelection(vector<float> score, int k = 2) {
+	// 随机选择k个个体
+	vector<int> candidates;
+	for (int i = 0; i < k; i++) {
+		int idx = rand() % score.size();
+		candidates.push_back(idx);
+	}
+	// 选择其中适应度最高的
+	int bestIdx = candidates[0];
+	for (int idx : candidates) {
+		if (score[idx] > score[bestIdx]) {
+			bestIdx = idx;
+		}
+	}
+	return bestIdx;
+}
+
+// 轮盘赌选择函数
+int rouletteWheelSelection(vector<float> score) {
+	// 计算适应度总和
+	double totalFitness = 0;
+	for (float s : score) {
+		totalFitness += s;
+	}
+	// 生成随机数
+	double r = (rand() / (double)RAND_MAX) * totalFitness;
+	// 选择个体
+	double cumulativeFitness = 0;
+	for (int i = 0; i < score.size(); i++) {
+		cumulativeFitness += score[i];
+		if (cumulativeFitness >= r) {
+			return i;
+		}
+	}
+	return 0; // 防止异常情况
+}
+
 void selection(vector<float> score, vector<NeuralNetwork> bird) {
 	// 基于适应度选择前5个最好的小鸟
 	vector<pair<float, int>> scoreIndex;
@@ -21,11 +59,10 @@ void selection(vector<float> score, vector<NeuralNetwork> bird) {
 	sort(scoreIndex.begin(), scoreIndex.end(), [](const pair<float, int>& a, const pair<float, int>& b) {
 		return a.first > b.first;
 	});
-	// 保存前25个最好的小鸟
-	for (int i = 0; i < 25; i++) {
+	// 保存前5个最好的小鸟
+	for (int i = 0; i < 5; i++) {
 		bird[scoreIndex[i].second].saveModel(3, i);
 	}
-
 }
 
 int main()
@@ -310,9 +347,9 @@ int main()
 			float normalizedUpDistance = datalYup[i] / (100.0 * scale);
 			float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
 			birdState[i] = Matrix(5, 0, 0);
-			birdState[i].setValue(1, 1, normalizedHeight);
-			birdState[i].setValue(2, 1, normalizedVelocity);
-			birdState[i].setValue(3, 1, normalizedDistance);
+			birdState[i].setValue(1, 1, 2*normalizedHeight);
+			birdState[i].setValue(2, 1, 2*normalizedVelocity);
+			birdState[i].setValue(3, 1, 2*normalizedDistance);
 			birdState[i].setValue(4, 1, normalizedUpDistance);
 			birdState[i].setValue(5, 1, normalizedDownDistance);
 			//birdState[i].show();
@@ -368,11 +405,11 @@ int main()
 					float normalizedDistance = datalX[i] / (256.0 * scale);
 					float normalizedUpDistance = datalYup[i] / (100.0 * scale);
 					float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
-					birdState[i].setValue(0, 0, normalizedHeight);
-					birdState[i].setValue(1, 0, normalizedVelocity);
-					birdState[i].setValue(2, 0, normalizedDistance);
-					birdState[i].setValue(3, 0, normalizedUpDistance);
-					birdState[i].setValue(4, 0, normalizedDownDistance);
+					birdState[i].setValue(1, 1, 2 * normalizedHeight);
+					birdState[i].setValue(2, 1, 2 * normalizedVelocity);
+					birdState[i].setValue(3, 1, 2 * normalizedDistance);
+					birdState[i].setValue(4, 1, normalizedUpDistance);
+					birdState[i].setValue(5, 1, normalizedDownDistance);
 				}
 			}
 			if (!trainStart) {
@@ -437,19 +474,6 @@ int main()
 				}
 				birds[i].setRotation(v[i]);
 			}
-			if (aiTime > 0.25) {
-				aiTime = 0;
-				for (int i = 0; i < birdNum; i++) {
-					int choice = bird[i].play(birdState[i]);
-					if (choice == 1) {
-						v[i] -= 10;
-						birdHeights[i] += v[i];
-					}
-					cout << "bird" << i << " choose " << choice << endl;
-				}
-			}
-
-
 			window.clear(Color::White);
 			b1.setPosition(0 - backgroudMove, 0);
 			window.draw(b1);
@@ -468,6 +492,20 @@ int main()
 				datalYup[i] = birdHeights[i] - upPipeArea;
 				datalYdowm[i] = downPipeArea - (birdHeights[i] + 24 * scale);
 
+				// 优化状态输入的缩放方式
+				// 归一化到 -1 到 1 范围
+				float normalizedHeight = (birdHeights[i] / (384.0 * scale - 24.0 * scale)) * 2.0 - 1.0;
+				float normalizedVelocity = v[i] / 20.0; // 速度范围 -10 到 10，归一化到 -0.5 到 0.5
+				float normalizedDistance = datalX[i] / (256.0 * scale);
+				float normalizedUpDistance = datalYup[i] / (100.0 * scale);
+				float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
+
+				birdState[i].setValue(1, 1, 2 * normalizedHeight);
+				birdState[i].setValue(2, 1, 2 * normalizedVelocity);
+				birdState[i].setValue(3, 1, 2 * normalizedDistance);
+				birdState[i].setValue(4, 1, normalizedUpDistance);
+				birdState[i].setValue(5, 1, normalizedDownDistance);
+
 				if ((datalYdowm[i] <= 0 || datalYup[i] <= 0) && (datalX[i] <= 0 && 0 - 34 * scale <= datalX[i] + 60 * scale)) {
 					state[i] = 3;
 					birdDead[i] = true;
@@ -483,23 +521,24 @@ int main()
 					score[i]++;
 				}
 
-				// 优化状态输入的缩放方式
-				// 归一化到 -1 到 1 范围
-				float normalizedHeight = (birdHeights[i] / (384.0 * scale - 24.0 * scale)) * 2.0 - 1.0;
-				float normalizedVelocity = v[i] / 20.0 + 10;
-				float normalizedDistance = datalX[i] / (256.0 * scale);
-				float normalizedUpDistance = datalYup[i] / (100.0 * scale);
-				float normalizedDownDistance = datalYdowm[i] / (100.0 * scale);
-
-				birdState[i].setValue(0, 0, normalizedHeight);
-				birdState[i].setValue(1, 0, normalizedVelocity);
-				birdState[i].setValue(2, 0, normalizedDistance);
-				birdState[i].setValue(3, 0, normalizedUpDistance);
-				birdState[i].setValue(4, 0, normalizedDownDistance);
-
 				birds[i].setTextureRect(IntRect(34 * state[i], 0, 34, 24)); // 矩形范围
 				birds[i].setPosition(birdxs[i] - 34 * scale, birdHeights[i]);
 				window.draw(birds[i]);
+			}
+
+			if (aiTime > 0.25) {
+				aiTime = 0;
+				for (int i = 0; i < birdNum; i++) {
+					if (birdDead[i]) {
+						continue;
+					}
+					int choice = bird[i].play(birdState[i]);
+					if (choice == 1) {
+						v[i] -= 10;
+						birdHeights[i] += v[i];
+					}
+					cout << "bird" << i << " choose " << choice << endl;
+				}
 			}
 			int count = 0;
 			for (int i = 0; i < birdNum; i++) {
@@ -512,7 +551,17 @@ int main()
 				selection(score, bird);
 				srand(std::time(0));
 				for (int i = 0; i < birdNum; i++) {
-					bird[i].crossoverAndmutation(3, rand() % 25, (rand() % 25 + 3) % 25);
+					// 随机选择父母
+					int parent1 = tournamentSelection(score, 3); // 3轮锦标赛
+					int parent2 = tournamentSelection(score, 3);
+					// 随机选择交叉方式
+					if (rand() / (double)RAND_MAX < 0.5) {
+						// 使用均匀交叉
+						bird[i].uniformCrossover(3, parent1, parent2);
+					} else {
+						// 使用算术交叉
+						bird[i].arithmeticCrossover(3, parent1, parent2);
+					}
 				}
 			}
 			window.display();
