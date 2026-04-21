@@ -1,4 +1,4 @@
-﻿#include <SFML/Graphics.hpp>
+﻿﻿#include <SFML/Graphics.hpp>
 #include <string>
 #include <cstdlib>
 #include <random>
