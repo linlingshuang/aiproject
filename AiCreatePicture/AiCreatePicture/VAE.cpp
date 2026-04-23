@@ -1,69 +1,31 @@
 #include "VAE.h"
-//#include "NeuralNetwork.h"
+#include "NeuralNetwork.h"
 
-// Function //
-Matrix sigmoid(Matrix X) {
-    Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
-    for (int i = 0; i < C.getrowNum(); i++) {
-        for (int j = 0; j < C.getcolumnNum(); j++) {
-            C.setValue(i + 1, j + 1, 1.0 / (1.0 + exp(-X.getVectorD()[j][i])));
-        }
-    }
-    return C;
-}
-Matrix tanh(Matrix X) {
-    Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
-    for (int i = 0; i < C.getrowNum(); i++) {
-        for (int j = 0; j < C.getcolumnNum(); j++) {
-            C.setValue(i + 1, j + 1, (1 - exp(-2 * X.getVectorD()[j][i])) / (1 + exp(-2 * X.getVectorD()[j][i])));
-        }
-    }
-    return C;
-}
-Matrix ReLU(Matrix X) {
-    Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
-    for (int i = 0; i < C.getrowNum(); i++) {
-        for (int j = 0; j < C.getcolumnNum(); j++) {
-            if (X.getVectorD()[j][i] >= 0) {
-                C.setValue(i + 1, j + 1, X.getVectorD()[j][i]);
-            }
-            else {
-                C.setValue(i + 1, j + 1, 0);
-            }
-        }
-    }
-    return C;
-}
-Matrix softmax(Matrix Out) {
-    double sum = 0;
-    for (int i = 0; i < Out.getrowNum(); i++) {
-        sum += exp(Out.getVectorD()[0][i]);
-    }
-    Matrix Y(Out.getrowNum(), Out.getcolumnNum());
-    for (int i = 0; i < Out.getrowNum(); i++) {
-        Y.setValue(i + 1, 1, (exp(Out.getVectorD()[0][i]) / sum));
-    }
-    return Y;
-}
 
 VAE::VAE(int input_dim, int hidden_dim1, int hidden_dim2, int latent_dim) {
-    // ... 存储维度
-    init_weights(W_e1, input_dim, hidden_dim1);
-    init_bias(b_e1, hidden_dim1);
-    init_weights(W_e2, hidden_dim1, hidden_dim2);
-    init_bias(b_e2, hidden_dim2);
-    init_weights(W_mu, hidden_dim2, latent_dim);
-    init_bias(b_mu, latent_dim);
-    init_weights(W_logvar, hidden_dim2, latent_dim);
-    init_bias(b_logvar, latent_dim);
+	this->input_dim = input_dim;
+	this->latent_dim = latent_dim;
+	init_weights(W_e1, input_dim, hidden_dim1);
+	init_bias(b_e1, hidden_dim1);
+	init_weights(W_e2, hidden_dim1, hidden_dim2);
+	init_bias(b_e2, hidden_dim2);
+	init_weights(W_mu, hidden_dim2, latent_dim);
+	init_bias(b_mu, latent_dim);
+	init_weights(W_logvar, hidden_dim2, latent_dim);
+	init_bias(b_logvar, latent_dim);
 
-    init_weights(W_d1, latent_dim, hidden_dim2);
-    init_bias(b_d1, hidden_dim2);
-    init_weights(W_d2, hidden_dim2, hidden_dim1);
-    init_bias(b_d2, hidden_dim1);
-    init_weights(W_d3, hidden_dim1, input_dim);
-    init_bias(b_d3, input_dim);
+	init_weights(W_d1, latent_dim, hidden_dim2);
+	init_bias(b_d1, hidden_dim2);
+	init_weights(W_d2, hidden_dim2, hidden_dim1);
+	init_bias(b_d2, hidden_dim1);
+	init_weights(W_d3, hidden_dim1, input_dim);
+	init_bias(b_d3, input_dim);
 }
+
+VAE::~VAE() {
+	// 析构函数，Matrix 会自动管理内存
+}
+
 void VAE::init_weights(Matrix& W, int n_in, int n_out) {
     double limit = sqrt(6.0 / (n_in + n_out));
     W = Matrix(n_out, n_in, 0.0);
@@ -435,40 +397,73 @@ double VAE::train_step(const Matrix& x, double learning_rate) {
 
     return L;
 }
-void save_matrix(const Matrix& M, const std::string& num) {
-    string fileName = num;
-    ofstream outWeightsFile;
-    double w;
-    outWeightsFile.open(fileName);
-    for (int k = 0; k < M.getrowNum(); k++) {
-        for (int j = 0; j < M.getcolumnNum(); j++) {
-            w = M.getVectorD()[j][k];
-            outWeightsFile << w << ' ';
-        }
-        outWeightsFile << endl;
-    }
-    outWeightsFile.close();
+static void save_matrix(const Matrix& M, const std::string& num) {
+	string fileName = num;
+	ofstream outWeightsFile;
+	double w;
+	outWeightsFile.open(fileName);
+	for (int k = 0; k < M.getrowNum(); k++) {
+		for (int j = 0; j < M.getcolumnNum(); j++) {
+			w = M.getVectorD()[j][k];
+			outWeightsFile << w << ' ';
+		}
+		outWeightsFile << endl;
+	}
+	outWeightsFile.close();
 }
+
+static void load_matrix(Matrix& M, const std::string& num) {
+	string fileName = num;
+	ifstream inWeightsFile;
+	double w;
+	inWeightsFile.open(fileName);
+	if (!inWeightsFile.is_open()) {
+		cerr << "无法打开文件: " << fileName << endl;
+		return;
+	}
+	for (int k = 0; k < M.getrowNum(); k++) {
+		for (int j = 0; j < M.getcolumnNum(); j++) {
+			inWeightsFile >> w;
+			M.setValue(k + 1, j + 1, w);
+		}
+	}
+	inWeightsFile.close();
+}
+
 void VAE::save(const std::string& prefix)const {
+	save_matrix(W_e1, prefix + "_We1.txt");
+	save_matrix(b_e1, prefix + "_be1.txt");
+	save_matrix(W_e2, prefix + "_We2.txt");
+	save_matrix(b_e2, prefix + "_be2.txt");
+	save_matrix(W_mu, prefix + "_Wmu.txt");
+	save_matrix(b_mu, prefix + "_bmu.txt");
+	save_matrix(W_logvar, prefix + "_Wlogvar.txt");
+	save_matrix(b_logvar, prefix + "_blogvar.txt");
 
-    save_matrix(W_e1, prefix + "_We1.bin");
-    save_matrix(b_e1, prefix + "_be1.bin");
-    save_matrix(W_e2, prefix + "_We1.bin");
-    save_matrix(b_e2, prefix + "_be1.bin");
-    save_matrix(W_mu, prefix + "_We1.bin");
-    save_matrix(b_mu, prefix + "_be1.bin");
-    save_matrix(W_logvar, prefix + "_We1.bin");
-    save_matrix(b_logvar, prefix + "_be1.bin");
-
-    save_matrix(W_d1, prefix + "_We1.bin");
-    save_matrix(b_d1, prefix + "_be1.bin");
-    save_matrix(W_d2, prefix + "_We1.bin");
-    save_matrix(b_d2, prefix + "_be1.bin");
-    save_matrix(W_d3, prefix + "_We1.bin");
-    save_matrix(b_d3, prefix + "_be1.bin");
+	save_matrix(W_d1, prefix + "_Wd1.txt");
+	save_matrix(b_d1, prefix + "_bd1.txt");
+	save_matrix(W_d2, prefix + "_Wd2.txt");
+	save_matrix(b_d2, prefix + "_bd2.txt");
+	save_matrix(W_d3, prefix + "_Wd3.txt");
+	save_matrix(b_d3, prefix + "_bd3.txt");
 }
+
 void VAE::load(const std::string& prefix) {
-   
+	load_matrix(W_e1, prefix + "_We1.txt");
+	load_matrix(b_e1, prefix + "_be1.txt");
+	load_matrix(W_e2, prefix + "_We2.txt");
+	load_matrix(b_e2, prefix + "_be2.txt");
+	load_matrix(W_mu, prefix + "_Wmu.txt");
+	load_matrix(b_mu, prefix + "_bmu.txt");
+	load_matrix(W_logvar, prefix + "_Wlogvar.txt");
+	load_matrix(b_logvar, prefix + "_blogvar.txt");
+
+	load_matrix(W_d1, prefix + "_Wd1.txt");
+	load_matrix(b_d1, prefix + "_bd1.txt");
+	load_matrix(W_d2, prefix + "_Wd2.txt");
+	load_matrix(b_d2, prefix + "_bd2.txt");
+	load_matrix(W_d3, prefix + "_Wd3.txt");
+	load_matrix(b_d3, prefix + "_bd3.txt");
 }
 
 

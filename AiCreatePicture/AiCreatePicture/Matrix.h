@@ -100,7 +100,7 @@ private:
 	int columnNum;
 };
 // Matrix calculations //
-Matrix multiplication(Matrix A, Matrix B) {
+inline Matrix multiplication(Matrix A, Matrix B) {
 	if (A.getcolumnNum() != B.getrowNum()) {
 		Matrix C = Matrix();
 		return C;
@@ -117,7 +117,7 @@ Matrix multiplication(Matrix A, Matrix B) {
 	}
 	return C;
 }
-Matrix multiplicationOneByOne(Matrix A, Matrix B) {
+inline Matrix multiplicationOneByOne(Matrix A, Matrix B) {
 	if (A.getcolumnNum() != B.getcolumnNum() || A.getrowNum() != B.getrowNum()) {
 		Matrix C = Matrix();
 		return C;
@@ -132,7 +132,7 @@ Matrix multiplicationOneByOne(Matrix A, Matrix B) {
 	}
 	return C;
 }
-Matrix addition(Matrix A, Matrix B) {
+inline Matrix addition(Matrix A, Matrix B) {
 	if (A.getcolumnNum() != B.getcolumnNum() || A.getrowNum() != B.getrowNum()) {
 		Matrix C = Matrix();
 		return C;
@@ -147,7 +147,7 @@ Matrix addition(Matrix A, Matrix B) {
 	}
 	return C;
 }
-Matrix subtraction(Matrix A, Matrix B) {
+inline Matrix subtraction(Matrix A, Matrix B) {
 	if (A.getcolumnNum() != B.getcolumnNum() || A.getrowNum() != B.getrowNum()) {
 		Matrix C = Matrix();
 		return C;
@@ -162,7 +162,7 @@ Matrix subtraction(Matrix A, Matrix B) {
 	}
 	return C;
 }
-Matrix transpose(Matrix A) {
+inline Matrix transpose(Matrix A) {
 	Matrix C = Matrix(A.getcolumnNum(), A.getrowNum());
 	for (int i = 0; i < A.getrowNum(); i++) {
 		for (int j = 0; j < A.getcolumnNum(); j++) {
@@ -171,7 +171,7 @@ Matrix transpose(Matrix A) {
 	}
 	return C;
 }
-Matrix readTxtToMatrix(const string& filepath) {
+inline Matrix readTxtToMatrix(const string& filepath) {
 	ifstream file(filepath);
 	if (!file.is_open()) {
 		cerr << "无法打开文件: " << filepath << endl;
