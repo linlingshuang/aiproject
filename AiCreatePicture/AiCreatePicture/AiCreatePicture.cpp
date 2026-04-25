@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
 		text2Clear.setFont(font);
 		text3trainTime.setFont(font);
 
-		text1inform.setString("draw in the \nwhite area\n20times");
+		text1inform.setString("draw in the \nwhite area\n100times");
 		text1inform.setCharacterSize(48);
 		text1inform.setFillColor(sf::Color::Black);
 		text1inform.setStyle(sf::Text::Bold);
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
 		text2Clear.setPosition(380, 480);
 
 		int trainTime = 0;
-		text3trainTime.setString(std::string("trainTime\n") + std::to_string(myNum));
+		text3trainTime.setString(std::string("trainTime\n") + std::to_string(trainTime));
 		text3trainTime.setCharacterSize(48);
 		text3trainTime.setFillColor(sf::Color::Black);
 		text3trainTime.setStyle(sf::Text::Bold);
@@ -124,6 +124,7 @@ int main(int argc, char* argv[]) {
 		text4AI.loadFromFile("generated_0.png");
 		sf::Sprite DIYphoto(text4AI);
 		DIYphoto.setTextureRect(sf::IntRect(0, 0, 32, 32));
+		DIYphoto.setScale(6, 6);
 		DIYphoto.setPosition(380, 40);
 
 		// 创建绘制区域 (320x320)
@@ -156,6 +157,11 @@ int main(int argc, char* argv[]) {
 					// 检查按钮区域
 					if (x >= 380 && x <= 620 && y >= 300 && y <= 460) {
 						trainTime++;
+						text3trainTime.setString(std::string("trainTime\n") + std::to_string(trainTime));
+						text3trainTime.setCharacterSize(48);
+						text3trainTime.setFillColor(sf::Color::Black);
+						text3trainTime.setStyle(sf::Text::Bold);
+						text3trainTime.setPosition(380, 300);
 						// Submit 按钮：进行预测
 						// 将 drawingGrid 转换为输入矩阵
 						Matrix input(32 * 32, 1, 0.0);
@@ -169,9 +175,12 @@ int main(int argc, char* argv[]) {
 						pair<int, string>temp;
 						temp.first = 0;
 						temp.second = "DIY";
-						vae.train_step(temp, lr, input);
+						double loss=vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						cout << "trainTime " << trainTime <<", 损失 = " << loss << endl;
 
-						if (trainTime % 20 == 0) {
+						if (trainTime % 100 == 0) {
 							vae.save("vae_final_DIY");
 							cout << "===== 训练完成 =====" << endl;
 							trainTime = 0;
@@ -192,6 +201,7 @@ int main(int argc, char* argv[]) {
 							text4AI.loadFromFile("generated_DIY.png");
 							DIYphoto = sf::Sprite(text4AI);
 							DIYphoto.setTextureRect(sf::IntRect(0, 0, 32, 32));
+							DIYphoto.setScale(6, 6);
 							DIYphoto.setPosition(380, 40);
 						}
 					}
