@@ -90,10 +90,10 @@ Matrix VAE::reparameterize(const Matrix& mu, const Matrix& logvar) {
         sigma.setValue(i + 1, 1, s);
     }
 
-    // 生成标准正态随机数
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<> dist(0.0, 1.0);
+    // 生成标准正态随机数（使用静态随机数生成器）
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::normal_distribution<> dist(0.0, 1.0);
     Matrix epsilon(mu.getrowNum(), 1);
     for (int i = 0; i < mu.getrowNum(); ++i) {
         epsilon.setValue(i + 1, 1, dist(gen));
@@ -120,7 +120,9 @@ double VAE::loss(const Matrix& x, const Matrix& recon, const Matrix& mu, const M
     for (int i = 0; i < input_dim; ++i) {
         double xi = x.getVectorD()[0][i];
         double xhat = recon.getVectorD()[0][i];
-        recon_loss -= xi * log(xhat + 1e-10) + (1 - xi) * log(1 - xhat + 1e-10);
+        // 确保 xhat 在合理范围内
+        xhat = max(1e-10, min(1.0 - 1e-10, xhat));
+        recon_loss -= xi * log(xhat) + (1 - xi) * log(1 - xhat);
     }
 
     // KL 散度
@@ -128,13 +130,24 @@ double VAE::loss(const Matrix& x, const Matrix& recon, const Matrix& mu, const M
     for (int j = 0; j < latent_dim; ++j) {
         double mu_j = mu.getVectorD()[0][j];
         double logvar_j = logvar.getVectorD()[0][j];
-        kl += 1 + logvar_j - mu_j * mu_j - exp(logvar_j);
+        // 防止 exp 溢出
+        double exp_logvar = exp(min(logvar_j, 20.0));
+        kl += 1 + logvar_j - mu_j * mu_j - exp_logvar;
     }
     kl *= -0.5;
+
+    // 确保损失值不是 NaN 或 Inf
+    if (isnan(recon_loss) || isinf(recon_loss)) {
+        recon_loss = 1e10;
+    }
+    if (isnan(kl) || isinf(kl)) {
+        kl = 1e10;
+    }
 
     return recon_loss + kl;
 }
 double VAE::train_step(const Matrix& x, double learning_rate) {
+    cout << 1 << endl;
     // 1. 前向：得到 recon, mu, logvar
     Matrix recon, mu, logvar;
     forward(x, recon, mu, logvar);

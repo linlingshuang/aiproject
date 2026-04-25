@@ -10,14 +10,21 @@ using namespace std;
 vector<Matrix> load_training_data(const string& folder_path) {
     vector<Matrix> data;
     int count = 0;
-    for (const auto& entry : filesystem::directory_iterator(folder_path)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".txt" && count < 10) {
-            Matrix img = readTxtToMatrix(entry.path().string());
-            data.push_back(img);
-            count++;
+    cout << "开始加载训练数据，路径: " << folder_path << endl;
+    try {
+        for (const auto& entry : filesystem::directory_iterator(folder_path)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".txt" && count < 10) {
+                cout << "加载文件: " << entry.path().string() << endl;
+                Matrix img = readTxtToMatrix(entry.path().string());
+                data.push_back(img);
+                count++;
+                cout << "已加载 " << count << " 张图片" << endl;
+            }
         }
+    } catch (const filesystem::filesystem_error& e) {
+        cerr << "文件系统错误: " << e.what() << endl;
     }
-    cout << "加载了 " << data.size() << " 张训练图片" << endl;
+    cout << "加载完成，共加载了 " << data.size() << " 张训练图片" << endl;
     return data;
 }
 
@@ -34,13 +41,13 @@ void save_image(const Matrix& img, const string& filename) {
 
 int main(int argc, char* argv[]) {
     const int input_dim = 32 * 32;
-    const int hidden1 = 32;
-    const int hidden2 = 16;
-    const int latent_dim = 5;
-    const double lr = 0.001;
-    const int epochs = 10;
+    const int hidden1 = 16;
+    const int hidden2 = 8;
+    const int latent_dim = 2;
+    const double lr = 0.0001;
+    const int epochs = 1;
 
-    string mode = "train";
+    string mode = "generate";
     if (argc > 1) {
         mode = argv[1];
     }
@@ -49,6 +56,7 @@ int main(int argc, char* argv[]) {
 
     if (mode == "train") {
         cout << "===== 开始训练 =====" << endl;
+        cout << "当前工作目录: " << filesystem::current_path() << endl;
         vector<Matrix> train_images = load_training_data("trainingDigits");
         
         if (train_images.empty()) {

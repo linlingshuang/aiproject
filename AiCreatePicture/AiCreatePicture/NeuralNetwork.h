@@ -16,7 +16,15 @@ Matrix sigmoid(Matrix X) {
 	Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
 	for (int i = 0; i < C.getrowNum(); i++) {
 		for (int j = 0; j < C.getcolumnNum(); j++) {
-			C.setValue(i + 1, j + 1, 1.0 / (1.0 + exp(-X.getVectorD()[j][i])));
+			double x = X.getVectorD()[j][i];
+			// 防止 exp 溢出
+			if (x > 20.0) {
+				C.setValue(i + 1, j + 1, 1.0);
+			} else if (x < -20.0) {
+				C.setValue(i + 1, j + 1, 0.0);
+			} else {
+				C.setValue(i + 1, j + 1, 1.0 / (1.0 + exp(-x)));
+			}
 		}
 	}
 	return C;
