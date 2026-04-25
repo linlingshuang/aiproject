@@ -4,6 +4,7 @@
 #include <filesystem>
 #include "lodepng.h"
 #include "VAE.h"
+#include "NeuralNetwork.h"
 #include <SFML/Graphics.hpp>
 
 
@@ -28,10 +29,6 @@ int main(int argc, char* argv[]) {
 	const double lr = 0.001;
 	const int epochs = 5;
 
-	int myNum;
-	cout << "输入数字：";
-	cin >> myNum;
-
 	string mode;
 	cout << "输入模式：";
 	cin >> mode;
@@ -44,6 +41,9 @@ int main(int argc, char* argv[]) {
 	VAE vae(input_dim, hidden1, hidden2, latent_dim);
 
 	if (mode == "train") {
+		int myNum;
+		cout << "输入数字：";
+		cin >> myNum;
 		cout << "===== 开始训练 =====" << endl;
 		vae.loadTrainingData("E:/Code/Github/AiProject/AiCreatePicture/AiCreatePicture/trainingDigits/" + to_string(myNum));
 		for (int epoch = 0; epoch < epochs; epoch++) {
@@ -68,26 +68,202 @@ int main(int argc, char* argv[]) {
 		cout << "===== 训练完成 =====" << endl;
 	}
 	else if (mode == "generate") {
-		cout << "===== 开始生成图片 =====" << endl;
-		vae.load("vae_final" + to_string(myNum));
+		// 创建神经网络并加载训练好的权重
+		NeuralNetwork nn;
+		nn.initNet(3, 0.01, 0.01);
+		nn.loadModel(3);
 
-		random_device rd;
-		mt19937 gen(rd());
-		normal_distribution<> dist(0.0, 1.0);
-		Matrix z(latent_dim, 1);
-		for (int j = 0; j < latent_dim; j++) {
-			z.setValue(j + 1, 1, dist(gen));
+		srand(time(0));
+
+		sf::RenderWindow window(sf::VideoMode(640, 640), "AI guess and generated number");
+		sf::Texture text;
+		text.loadFromFile("window.png");
+		sf::Sprite myWindow(text);
+		myWindow.setTextureRect(sf::IntRect(0, 0, 640, 640));
+
+		// 文本对象
+		sf::Text text1inform, text2Clear, text3Submit;
+		sf::Font font;
+		font.loadFromFile("arial.ttf");
+		text1inform.setFont(font);
+		text2Clear.setFont(font);
+		text3Submit.setFont(font);
+
+		text1inform.setString("draw the num\nin the \nwhite area");
+		text1inform.setCharacterSize(48);
+		text1inform.setFillColor(sf::Color::Black);
+		text1inform.setStyle(sf::Text::Bold);
+		text1inform.setPosition(40, 40);
+
+		text2Clear.setString("clear \nthe area");
+		text2Clear.setCharacterSize(48);
+		text2Clear.setFillColor(sf::Color::Red);
+		text2Clear.setStyle(sf::Text::Bold);
+		text2Clear.setPosition(380, 480);
+
+		text3Submit.setString("submit \nthe num");
+		text3Submit.setCharacterSize(48);
+		text3Submit.setFillColor(sf::Color::Green);
+		text3Submit.setStyle(sf::Text::Bold);
+		text3Submit.setPosition(380, 300);
+
+		sf::Texture text4AI;
+		text4AI.loadFromFile("default.png");
+		sf::Sprite generated_photo(text4AI);
+		generated_photo.setTextureRect(sf::IntRect(0, 0, 32, 32));
+		generated_photo.setScale(6, 6);
+		generated_photo.setPosition(380, 40);
+
+		// 创建绘制区域 (320x320)
+		sf::RenderTexture drawTexture;
+		drawTexture.create(320, 320);
+		drawTexture.clear(sf::Color::White);
+		drawTexture.display();
+		sf::Sprite drawSprite(drawTexture.getTexture());
+		drawSprite.setPosition(20, 300);
+
+		// 32x32 绘制网格，0=空白，1=笔迹
+		int drawingGrid[32][32] = { 0 };
+
+		bool isDrawing = false;   // 鼠标左键是否按下
+
+		while (window.isOpen()) {
+			sf::Event gameEvent;
+			while (window.pollEvent(gameEvent)) {
+				if (gameEvent.type == sf::Event::Closed) {
+					window.close();
+				}
+
+				// 鼠标左键按下
+				if (gameEvent.type == sf::Event::MouseButtonPressed &&
+					gameEvent.mouseButton.button == sf::Mouse::Left) {
+					sf::Vector2i pos = sf::Mouse::getPosition(window);
+					int x = pos.x;
+					int y = pos.y;
+
+					// 检查按钮区域
+					if (x >= 380 && x <= 620 && y >= 300 && y <= 460) {
+						// Submit 按钮：进行预测
+						// 将 drawingGrid 转换为输入矩阵
+						Matrix input(32 * 32, 1, 0.0);
+						for (int row = 0; row < 32; ++row) {
+							for (int col = 0; col < 32; ++col) {
+								double val = drawingGrid[row][col] ? 1.0 : 0.0;
+								int idx = row * 32 + col; // 行优先
+								input.setValue(idx + 1, 1, val);
+							}
+						}
+						int result = nn.predict(input);
+						cout << "===== 开始生成图片 =====" << endl;
+						vae.load("vae_final" + to_string(result));
+
+						random_device rd;
+						mt19937 gen(rd());
+						normal_distribution<> dist(0.0, 1.0);
+						Matrix z(latent_dim, 1);
+						for (int j = 0; j < latent_dim; j++) {
+							z.setValue(j + 1, 1, dist(gen));
+						}
+
+						Matrix generated = vae.decode(z);
+						save_image(generated, "generated_" + to_string(result) + ".png");
+
+						cout << "===== 生成完成 =====" << endl;
+						text4AI.loadFromFile("generated_" + to_string(result) + ".png");
+						generated_photo = sf::Sprite(text4AI);
+						generated_photo.setTextureRect(sf::IntRect(0, 0, 32, 32));
+						generated_photo.setScale(6, 6);
+						generated_photo.setPosition(380, 40);
+						
+					}
+					else if (x >= 380 && x <= 620 && y >= 480 && y <= 620) {
+						// Clear 按钮：清空绘制区域
+						drawTexture.clear(sf::Color::White);
+						drawTexture.display();
+						memset(drawingGrid, 0, sizeof(drawingGrid));
+						// 不清除 AI 结果，可保留上次预测
+					}
+					else if (x >= 20 && x <= 340 && y >= 300 && y <= 620) {
+						// 开始绘制
+						isDrawing = true;
+						// 立即绘制当前点
+						int localX = x - 20;
+						int localY = y - 300;
+						// 在 drawTexture 上画圆
+						sf::CircleShape circle(25);
+						circle.setFillColor(sf::Color::Black);
+						circle.setPosition(localX - 5, localY - 5);
+						drawTexture.draw(circle);
+						drawTexture.display();
+
+						// 更新 drawingGrid：标记鼠标所在格子及周围 8 邻域
+						int gx = localX / 10;
+						int gy = localY / 10;
+						for (int dy = -1; dy <= 1; ++dy) {
+							for (int dx = -1; dx <= 1; ++dx) {
+								int nx = gx + dx;
+								int ny = gy + dy;
+								if (nx >= 0 && nx < 32 && ny >= 0 && ny < 32) {
+									drawingGrid[ny][nx] = 1;
+								}
+							}
+						}
+					}
+				}
+
+				// 鼠标左键释放
+				if (gameEvent.type == sf::Event::MouseButtonReleased &&
+					gameEvent.mouseButton.button == sf::Mouse::Left) {
+					isDrawing = false;
+				}
+
+				// 鼠标移动
+				if (gameEvent.type == sf::Event::MouseMoved && isDrawing) {
+					sf::Vector2i pos = sf::Mouse::getPosition(window);
+					int x = pos.x;
+					int y = pos.y;
+					if (x >= 20 && x <= 340 && y >= 300 && y <= 620) {
+						int localX = x - 20;
+						int localY = y - 300;
+						// 画圆
+						sf::CircleShape circle(25);
+						circle.setFillColor(sf::Color::Black);
+						circle.setPosition(localX - 5, localY - 5);
+						drawTexture.draw(circle);
+						drawTexture.display();
+
+						// 更新 drawingGrid
+						int gx = localX / 10;
+						int gy = localY / 10;
+						for (int dy = -1; dy <= 1; ++dy) {
+							for (int dx = -1; dx <= 1; ++dx) {
+								int nx = gx + dx;
+								int ny = gy + dy;
+								if (nx >= 0 && nx < 32 && ny >= 0 && ny < 32) {
+									drawingGrid[ny][nx] = 1;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// 绘制界面
+			window.clear(sf::Color::White);
+			window.draw(myWindow);
+			window.draw(text1inform);
+			window.draw(text2Clear);
+			window.draw(text3Submit);
+			window.draw(drawSprite);
+			window.draw(generated_photo);
+			window.display();
 		}
-
-		Matrix generated = vae.decode(z);
-		save_image(generated, "generated_" + to_string(myNum) + ".png");
-
-		cout << "===== 生成完成 =====" << endl;
+		
 	}
 	else if (mode == "DIY") {
 		srand(time(0));
 
-		sf::RenderWindow window(sf::VideoMode(640, 640), "AI generated number");
+		sf::RenderWindow window(sf::VideoMode(640, 640), "AI generated symbol");
 		sf::Texture text;
 		text.loadFromFile("window.png");
 		sf::Sprite myWindow(text);
@@ -101,7 +277,7 @@ int main(int argc, char* argv[]) {
 		text2Clear.setFont(font);
 		text3trainTime.setFont(font);
 
-		text1inform.setString("draw in the \nwhite area\n100times");
+		text1inform.setString("draw in the \nwhite area\n20times");
 		text1inform.setCharacterSize(48);
 		text1inform.setFillColor(sf::Color::Black);
 		text1inform.setStyle(sf::Text::Bold);
@@ -121,7 +297,7 @@ int main(int argc, char* argv[]) {
 		text3trainTime.setPosition(380, 300);
 
 		sf::Texture text4AI;
-		text4AI.loadFromFile("generated_0.png");
+		text4AI.loadFromFile("default.png");
 		sf::Sprite DIYphoto(text4AI);
 		DIYphoto.setTextureRect(sf::IntRect(0, 0, 32, 32));
 		DIYphoto.setScale(6, 6);
@@ -178,9 +354,16 @@ int main(int argc, char* argv[]) {
 						double loss=vae.train_step(temp, lr, input);
 						loss = vae.train_step(temp, lr, input);
 						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
+						loss = vae.train_step(temp, lr, input);
 						cout << "trainTime " << trainTime <<", 损失 = " << loss << endl;
 
-						if (trainTime % 100 == 0) {
+						if (trainTime % 20 == 0) {
 							vae.save("vae_final_DIY");
 							cout << "===== 训练完成 =====" << endl;
 							trainTime = 0;

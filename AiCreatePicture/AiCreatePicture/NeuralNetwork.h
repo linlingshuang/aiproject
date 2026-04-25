@@ -11,7 +11,7 @@
 using namespace std;
 
 // Function //
-Matrix sigmoid(Matrix X) {
+inline Matrix sigmoid(Matrix X) {
 	Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
 	for (int i = 0; i < C.getrowNum(); i++) {
 		for (int j = 0; j < C.getcolumnNum(); j++) {
@@ -28,7 +28,7 @@ Matrix sigmoid(Matrix X) {
 	}
 	return C;
 }
-Matrix tanh(Matrix X) {
+inline Matrix tanh(Matrix X) {
 	Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
 	for (int i = 0; i < C.getrowNum(); i++) {
 		for (int j = 0; j < C.getcolumnNum(); j++) {
@@ -37,7 +37,7 @@ Matrix tanh(Matrix X) {
 	}
 	return C;
 }
-Matrix ReLU(Matrix X) {
+inline Matrix ReLU(Matrix X) {
 	Matrix C = Matrix(X.getrowNum(), X.getcolumnNum());
 	for (int i = 0; i < C.getrowNum(); i++) {
 		for (int j = 0; j < C.getcolumnNum(); j++) {
@@ -51,7 +51,7 @@ Matrix ReLU(Matrix X) {
 	}
 	return C;
 }
-Matrix softmax(Matrix Out) {
+inline Matrix softmax(Matrix Out) {
 	double sum = 0;
 	for (int i = 0; i < Out.getrowNum(); i++) {
 		sum += exp(Out.getVectorD()[0][i]);
@@ -74,7 +74,7 @@ double Loss(Matrix& rightValue, Matrix& prediectValue) {
 	return loss;
 }
 */
-double Loss(Matrix& target, Matrix& predict) {
+inline double Loss(Matrix& target, Matrix& predict) {
 	double loss = 0;
 	for (int i = 0; i < predict.getrowNum(); i++) {
 		double p = predict.getVectorD()[0][i];
