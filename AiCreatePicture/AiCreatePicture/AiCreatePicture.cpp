@@ -1,4 +1,4 @@
-﻿#include "VAE.h"
+﻿﻿﻿﻿#include "VAE.h"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -7,26 +7,6 @@
 
 using namespace std;
 
-vector<Matrix> load_training_data(const string& folder_path) {
-    vector<Matrix> data;
-    int count = 0;
-    cout << "开始加载训练数据，路径: " << folder_path << endl;
-    try {
-        for (const auto& entry : filesystem::directory_iterator(folder_path)) {
-            if (entry.is_regular_file() && entry.path().extension() == ".txt" && count < 10) {
-                cout << "加载文件: " << entry.path().string() << endl;
-                Matrix img = readTxtToMatrix(entry.path().string());
-                data.push_back(img);
-                count++;
-                cout << "已加载 " << count << " 张图片" << endl;
-            }
-        }
-    } catch (const filesystem::filesystem_error& e) {
-        cerr << "文件系统错误: " << e.what() << endl;
-    }
-    cout << "加载完成，共加载了 " << data.size() << " 张训练图片" << endl;
-    return data;
-}
 
 void save_image(const Matrix& img, const string& filename) {
     vector<unsigned char> image_data(32 * 32);
@@ -44,7 +24,7 @@ int main(int argc, char* argv[]) {
     const int hidden1 = 16;
     const int hidden2 = 8;
     const int latent_dim = 2;
-    const double lr = 0.0001;
+    const double lr = 0.001;
     const int epochs = 1;
 
     string mode = "generate";
@@ -56,21 +36,14 @@ int main(int argc, char* argv[]) {
 
     if (mode == "train") {
         cout << "===== 开始训练 =====" << endl;
-        cout << "当前工作目录: " << filesystem::current_path() << endl;
-        vector<Matrix> train_images = load_training_data("trainingDigits");
-        
-        if (train_images.empty()) {
-            cerr << "没有找到训练数据！" << endl;
-            return 1;
-        }
-
+        vae.loadTrainingData("E:/Code/Github/AiProject/AiCreatePicture/AiCreatePicture/trainingDigits");
         for (int epoch = 0; epoch < epochs; epoch++) {
             double total_loss = 0.0;
-            for (size_t i = 0; i < train_images.size(); i++) {
-                double loss = vae.train_step(train_images[i], lr);
+            for (size_t i = 0; i < vae.train_samples.size(); i++) {
+                double loss = vae.train_step(vae.train_samples[i], lr);
                 total_loss += loss;
             }
-            double avg_loss = total_loss / train_images.size();
+            double avg_loss = total_loss / vae.train_samples.size();
             cout << "Epoch " << epoch + 1 << "/" << epochs << ", 平均损失 = " << avg_loss << endl;
             
             if ((epoch + 1) % 10 == 0) {
@@ -78,18 +51,15 @@ int main(int argc, char* argv[]) {
                 cout << "模型已保存" << endl;
             }
         }
-
         vae.save("vae_final");
         cout << "===== 训练完成 =====" << endl;
     }
     else if (mode == "generate") {
         cout << "===== 开始生成图片 =====" << endl;
         vae.load("vae_final");
-
         random_device rd;
         mt19937 gen(rd());
         normal_distribution<> dist(0.0, 1.0);
-
         for (int i = 0; i < 10; i++) {
             Matrix z(latent_dim, 1);
             for (int j = 0; j < latent_dim; j++) {
@@ -101,11 +71,5 @@ int main(int argc, char* argv[]) {
         }
         cout << "===== 生成完成 =====" << endl;
     }
-    else {
-        cout << "使用方法：" << endl;
-        cout << "  训练: AiCreatePicture.exe train" << endl;
-        cout << "  生成: AiCreatePicture.exe generate" << endl;
-    }
-
     return 0;
 }

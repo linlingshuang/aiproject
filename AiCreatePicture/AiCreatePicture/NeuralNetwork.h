@@ -1,4 +1,4 @@
-﻿#pragma once
+﻿﻿﻿﻿#pragma once
 #pragma execution_character_set("utf-8")
 #include <fstream>
 #include <filesystem>
@@ -363,14 +363,6 @@ public:
 		// 输出层权重梯度 dW2 = delta_out * a_hidden^T
 		Matrix a_hidden = layerNeuron[layerNum - 2];  // (128,1)
 		Matrix dW2 = multiplication(delta_out, transpose(a_hidden));  // (10,128)
-		double testdW2sum = 0;
-		for (int i = 0; i < dW2.getrowNum(); i++) {
-			for (int j = 0; j < dW2.getcolumnNum(); j++) {
-				testdW2sum += pow(dW2.getVectorD()[j][i], 2);
-			}
-		}
-		//cout << endl << "dw2: "<<testdW2sum << endl;
-		//dW2.show("梯度");
 
 		// 输出层偏置梯度 db2 = delta_out
 		Matrix db2 = delta_out;
@@ -390,14 +382,6 @@ public:
 		// 隐藏层权重梯度 dW1 = delta_hidden * X^T
 		Matrix X = layerNeuron[0];  // (1024,1)
 		Matrix dW1 = multiplication(delta_hidden, transpose(X));  // (128,1024)
-		double testdW1sum = 0;
-		for (int i = 0; i < dW1.getrowNum(); i++) {
-			for (int j = 0; j < dW1.getcolumnNum(); j++) {
-				testdW1sum += pow(dW1.getVectorD()[j][i], 2);
-			}
-		}
-		//cout << endl <<"dw1: "<< testdW1sum << endl;
-		//dW1.show("梯度");
 
 		// 隐藏层偏置梯度 db1 = delta_hidden
 		Matrix db1 = delta_hidden;

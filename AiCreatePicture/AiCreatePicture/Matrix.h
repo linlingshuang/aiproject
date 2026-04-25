@@ -132,6 +132,21 @@ inline Matrix multiplicationOneByOne(Matrix A, Matrix B) {
 	}
 	return C;
 }
+inline Matrix divisionOneByOne(Matrix A, Matrix B) {
+	if (A.getcolumnNum() != B.getcolumnNum() || A.getrowNum() != B.getrowNum()) {
+		Matrix C = Matrix();
+		return C;
+	}
+	Matrix C = Matrix(A.getrowNum(), B.getcolumnNum());
+	for (int i = 0; i < A.getrowNum(); i++) {
+		for (int j = 0; j < B.getcolumnNum(); j++) {
+			double c = 0;
+			c += (A.getVectorD()[j][i] / B.getVectorD()[j][i]);
+			C.setValue(i + 1, j + 1, c);
+		}
+	}
+	return C;
+}
 inline Matrix addition(Matrix A, Matrix B) {
 	if (A.getcolumnNum() != B.getcolumnNum() || A.getrowNum() != B.getrowNum()) {
 		Matrix C = Matrix();
@@ -157,6 +172,17 @@ inline Matrix subtraction(Matrix A, Matrix B) {
 		for (int j = 0; j < B.getcolumnNum(); j++) {
 			double c = 0;
 			c += (A.getVectorD()[j][i] - B.getVectorD()[j][i]);
+			C.setValue(i + 1, j + 1, c);
+		}
+	}
+	return C;
+}
+inline Matrix subtraction(Matrix A, int I = 1) {
+	Matrix C = Matrix(A.getrowNum(), A.getcolumnNum());
+	for (int i = 0; i < A.getrowNum(); i++) {
+		for (int j = 0; j < A.getcolumnNum(); j++) {
+			double c = 0;
+			c += (1 - A.getVectorD()[j][i]);
 			C.setValue(i + 1, j + 1, c);
 		}
 	}

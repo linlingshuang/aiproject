@@ -43,40 +43,21 @@ void VAE::init_bias(Matrix& b, int n_out) {
 }
 void VAE::forward(const Matrix& x, Matrix& recon, Matrix& mu, Matrix& logvar) {
     // ---------- 编码器 ----------
-    // 第一层：x -> h1 (ReLU)
-    Matrix h1 = addition(multiplication(W_e1, x), b_e1);
-    h1 = ReLU(h1);
-
-    // 第二层：h1 -> h2 (ReLU)
-    Matrix h2 = addition(multiplication(W_e2, h1), b_e2);
-    h2 = ReLU(h2);
-
-    // 输出 mu 和 logvar（线性，无激活）
-    mu = addition(multiplication(W_mu, h2), b_mu);
-    logvar = addition(multiplication(W_logvar, h2), b_logvar);
-
+	encode(x, mu, logvar);
     // ---------- 重参数化 ----------
     Matrix z = reparameterize(mu, logvar);
-
+	layerNeuron[3] = z;
     // ---------- 解码器 ----------
-    // 第一层：z -> d1 (ReLU)
-    Matrix d1 = addition(multiplication(W_d1, z), b_d1);
-    d1 = ReLU(d1);
-
-    // 第二层：d1 -> d2 (ReLU)
-    Matrix d2 = addition(multiplication(W_d2, d1), b_d2);
-    d2 = ReLU(d2);
-
-    // 输出层：d2 -> recon (Sigmoid)
-    Matrix out = addition(multiplication(W_d3, d2), b_d3);
-    recon = sigmoid(out);
+    recon = decode(z);
 }
 void VAE::encode(const Matrix& x, Matrix& mu, Matrix& logvar) {
     Matrix h1 = addition(multiplication(W_e1, x), b_e1);
     h1 = ReLU(h1);   // 使用你已有的 ReLU
+	layerNeuron[1] = h1;
 
     Matrix h2 = addition(multiplication(W_e2, h1), b_e2);
     h2 = ReLU(h2);
+	layerNeuron[2] = h2;
 
     mu = addition(multiplication(W_mu, h2), b_mu);
     logvar = addition(multiplication(W_logvar, h2), b_logvar);
@@ -106,11 +87,15 @@ Matrix VAE::reparameterize(const Matrix& mu, const Matrix& logvar) {
 Matrix VAE::decode(const Matrix& z) {
     Matrix h2 = addition(multiplication(W_d1, z), b_d1);
     h2 = ReLU(h2);
+	layerNeuron[4] = h2;
 
     Matrix h1 = addition(multiplication(W_d2, h2), b_d2);
     h1 = ReLU(h1);
+	layerNeuron[5] = h1;
 
     Matrix out = addition(multiplication(W_d3, h1), b_d3);
+	layerNeuron[6] = out;
+
     out = sigmoid(out);  // 输出范围 (0,1)
     return out;
 }
@@ -146,269 +131,111 @@ double VAE::loss(const Matrix& x, const Matrix& recon, const Matrix& mu, const M
 
     return recon_loss + kl;
 }
-double VAE::train_step(const Matrix& x, double learning_rate) {
-    cout << 1 << endl;
-    // 1. 前向：得到 recon, mu, logvar
-    Matrix recon, mu, logvar;
-    forward(x, recon, mu, logvar);
-    double L = loss(x, recon, mu, logvar);
+double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
+	cout << "training" << endl;
+	// 1. 前向：得到 recon, mu, logvar
+	int label = xOrigin.first;
+	string filepath = xOrigin.second;
+	// 读取图片数据
+	Matrix x = readTxtToMatrix(filepath);
+	layerNeuron[0] = x;
 
-    // 2. 数值梯度（对所有权重和偏置逐一扰动）
-    // 以 W_e1 为例：
-    Matrix grad_W_e1(W_e1.getrowNum(), W_e1.getcolumnNum(), 0.0);
-    double eps = 1e-5;
-    for (int r = 0; r < W_e1.getrowNum(); ++r) {
-        for (int c = 0; c < W_e1.getcolumnNum(); ++c) {
-            double old = W_e1.getVectorD()[c][r]; // 注意存储顺序
-            W_e1.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_e1.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_e1.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_e1.getrowNum(); ++r)
-        for (int c = 0; c < W_e1.getcolumnNum(); ++c) {
-            double grad = grad_W_e1.getVectorD()[c][r];
-            double new_val = W_e1.getVectorD()[c][r] - learning_rate * grad;
-            W_e1.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_e1(b_e1.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_e1.getrowNum(); ++r) {
-        double old = b_e1.getVectorD()[0][r];
-        b_e1.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_e1.setValue(r + 1, 1, (L2 - L) / eps);
-        b_e1.setValue(r + 1, 1, old);
-    }
-    // 更新 b_e1
-    for (int r = 0; r < b_e1.getrowNum(); ++r) {
-        double grad = grad_b_e1.getVectorD()[0][r];
-        double new_val = b_e1.getVectorD()[0][r] - learning_rate * grad;
-        b_e1.setValue(r + 1, 1, new_val);
-    }
+	Matrix recon, mu, logvar;
+	forward(x, recon, mu, logvar);
+	double L = loss(x, recon, mu, logvar);
 
-    Matrix grad_W_e2(W_e2.getrowNum(), W_e2.getcolumnNum(), 0.0);
-    for (int r = 0; r < W_e2.getrowNum(); ++r) {
-        for (int c = 0; c < W_e2.getcolumnNum(); ++c) {
-            double old = W_e2.getVectorD()[c][r]; // 注意存储顺序
-            W_e2.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_e2.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_e2.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_e2.getrowNum(); ++r)
-        for (int c = 0; c < W_e2.getcolumnNum(); ++c) {
-            double grad = grad_W_e2.getVectorD()[c][r];
-            double new_val = W_e2.getVectorD()[c][r] - learning_rate * grad;
-            W_e2.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_e2(b_e2.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_e2.getrowNum(); ++r) {
-        double old = b_e2.getVectorD()[0][r];
-        b_e2.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_e2.setValue(r + 1, 1, (L2 - L) / eps);
-        b_e2.setValue(r + 1, 1, old);
-    }
-    // 更新 b_e2
-    for (int r = 0; r < b_e2.getrowNum(); ++r) {
-        double grad = grad_b_e2.getVectorD()[0][r];
-        double new_val = b_e2.getVectorD()[0][r] - learning_rate * grad;
-        b_e2.setValue(r + 1, 1, new_val);
-    }
+	//4.1 损失对解码器输出的导数
+	Matrix dL_dpi = subtraction(divisionOneByOne(subtraction(x, 1), subtraction(recon, 1)), divisionOneByOne(x, recon));
 
-    Matrix grad_W_mu(W_mu.getrowNum(), W_mu.getcolumnNum(), 0.0);
-    for (int r = 0; r < W_mu.getrowNum(); ++r) {
-        for (int c = 0; c < W_mu.getcolumnNum(); ++c) {
-            double old = W_mu.getVectorD()[c][r]; // 注意存储顺序
-            W_mu.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_mu.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_mu.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_mu.getrowNum(); ++r)
-        for (int c = 0; c < W_mu.getcolumnNum(); ++c) {
-            double grad = grad_W_mu.getVectorD()[c][r];
-            double new_val = W_mu.getVectorD()[c][r] - learning_rate * grad;
-            W_mu.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_mu(b_mu.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_mu.getrowNum(); ++r) {
-        double old = b_mu.getVectorD()[0][r];
-        b_mu.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_mu.setValue(r + 1, 1, (L2 - L) / eps);
-        b_mu.setValue(r + 1, 1, old);
-    }
-    // 更新 b_mu
-    for (int r = 0; r < b_mu.getrowNum(); ++r) {
-        double grad = grad_b_mu.getVectorD()[0][r];
-        double new_val = b_mu.getVectorD()[0][r] - learning_rate * grad;
-        b_mu.setValue(r + 1, 1, new_val);
-    }
+	//------//
+	// 输出层权重梯度 W_d3 = dL_dpi * deconh1^T
+	Matrix deconh1 = layerNeuron[5];  
+	Matrix dW_d3 = multiplication(dL_dpi, transpose(deconh1));
+	// 输出层偏置梯度 db_d3 = dL_dpi
+	Matrix db_d3 = dL_dpi;
 
-    Matrix grad_W_logvar(W_logvar.getrowNum(), W_logvar.getcolumnNum(), 0.0);
-    for (int r = 0; r < W_logvar.getrowNum(); ++r) {
-        for (int c = 0; c < W_logvar.getcolumnNum(); ++c) {
-            double old = W_logvar.getVectorD()[c][r]; // 注意存储顺序
-            W_logvar.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_logvar.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_logvar.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_logvar.getrowNum(); ++r)
-        for (int c = 0; c < W_logvar.getcolumnNum(); ++c) {
-            double grad = grad_W_logvar.getVectorD()[c][r];
-            double new_val = W_logvar.getVectorD()[c][r] - learning_rate * grad;
-            W_logvar.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_logvar(b_logvar.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_logvar.getrowNum(); ++r) {
-        double old = b_logvar.getVectorD()[0][r];
-        b_logvar.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_logvar.setValue(r + 1, 1, (L2 - L) / eps);
-        b_logvar.setValue(r + 1, 1, old);
-    }
-    // 更新 b_logvar
-    for (int r = 0; r < b_logvar.getrowNum(); ++r) {
-        double grad = grad_b_logvar.getVectorD()[0][r];
-        double new_val = b_logvar.getVectorD()[0][r] - learning_rate * grad;
-        b_logvar.setValue(r + 1, 1, new_val);
-    }
-    
-    Matrix grad_W_d1(W_d1.getrowNum(), W_d1.getcolumnNum(), 0.0);
-    for (int r = 0; r < W_d1.getrowNum(); ++r) {
-        for (int c = 0; c < W_d1.getcolumnNum(); ++c) {
-            double old = W_d1.getVectorD()[c][r]; // 注意存储顺序
-            W_d1.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_d1.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_d1.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_d1.getrowNum(); ++r)
-        for (int c = 0; c < W_d1.getcolumnNum(); ++c) {
-            double grad = grad_W_d1.getVectorD()[c][r];
-            double new_val = W_d1.getVectorD()[c][r] - learning_rate * grad;
-            W_d1.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_d1(b_d1.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_d1.getrowNum(); ++r) {
-        double old = b_d1.getVectorD()[0][r];
-        b_d1.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_d1.setValue(r + 1, 1, (L2 - L) / eps);
-        b_d1.setValue(r + 1, 1, old);
-    }
-    // 更新 b_d1
-    for (int r = 0; r < b_d1.getrowNum(); ++r) {
-        double grad = grad_b_d1.getVectorD()[0][r];
-        double new_val = b_d1.getVectorD()[0][r] - learning_rate * grad;
-        b_d1.setValue(r + 1, 1, new_val);
-    }
+	//------//
+	// 隐藏层误差 delta_h1 = (W_d3^T * dL_dpi) ⊙ ReLU'(deconh1)
+	Matrix W_d3T = transpose(W_d3);  
+	Matrix delta_h1_temp = multiplication(W_d3T, dL_dpi);
+	// 计算 ReLU 导数：val > 0 ? 1 : 0
+	Matrix ReLU_deriv(deconh1.getrowNum(), 1);
+	for (int i = 0; i < deconh1.getrowNum(); i++) {
+		double val = deconh1.getVectorD()[0][i];
+		ReLU_deriv.setValue(i + 1, 1, val > 0 ? 1 : 0);
+	}
+	Matrix delta_h1 = multiplicationOneByOne(delta_h1_temp, ReLU_deriv);  
+	// 隐藏层权重梯度 dW_d2 = delta_h1 * deconh2^T
+	Matrix deconh2 = layerNeuron[4];
+	Matrix dW_d2 = multiplication(delta_h1, transpose(deconh2));
+	// 隐藏层偏置梯度 db_d2 = delta_h1
+	Matrix db_d2 = delta_h1;
 
-    Matrix grad_W_d2(W_d2.getrowNum(), W_d2.getcolumnNum(), 0.0);
-    for (int r = 0; r < W_d2.getrowNum(); ++r) {
-        for (int c = 0; c < W_d2.getcolumnNum(); ++c) {
-            double old = W_d2.getVectorD()[c][r]; // 注意存储顺序
-            W_d2.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_d2.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_d2.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_d2.getrowNum(); ++r)
-        for (int c = 0; c < W_d2.getcolumnNum(); ++c) {
-            double grad = grad_W_d2.getVectorD()[c][r];
-            double new_val = W_d2.getVectorD()[c][r] - learning_rate * grad;
-            W_d2.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_d2(b_d2.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_d2.getrowNum(); ++r) {
-        double old = b_d2.getVectorD()[0][r];
-        b_d2.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_d2.setValue(r + 1, 1, (L2 - L) / eps);
-        b_d2.setValue(r + 1, 1, old);
-    }
-    // 更新 b_d2
-    for (int r = 0; r < b_d2.getrowNum(); ++r) {
-        double grad = grad_b_d2.getVectorD()[0][r];
-        double new_val = b_d2.getVectorD()[0][r] - learning_rate * grad;
-        b_d2.setValue(r + 1, 1, new_val);
-    }
+	//------//
+	// 隐藏层误差 delta_h2 = (W_d2^T * dW_d2) ⊙ ReLU'(deconh2)
+	Matrix W_d2T = transpose(W_d2);
+	Matrix delta_h2_temp = multiplication(W_d2T, dW_d2);
+	// 计算 ReLU 导数：val > 0 ? 1 : 0
+	Matrix ReLU_deriv2(deconh2.getrowNum(), 1);
+	for (int i = 0; i < deconh2.getrowNum(); i++) {
+		double val = deconh2.getVectorD()[0][i];
+		ReLU_deriv2.setValue(i + 1, 1, val > 0 ? 1 : 0);
+	}
+	Matrix delta_h2 = multiplicationOneByOne(delta_h2_temp, ReLU_deriv2);
+	// 隐藏层权重梯度 dW_d1 = delta_h2 * z^T
+	Matrix z = layerNeuron[3];
+	Matrix dW_d1 = multiplication(delta_h2, transpose(z));
+	// 隐藏层偏置梯度 db_d1 = delta_h2
+	Matrix db_d1 = delta_h2;
 
-    Matrix grad_W_d3(W_d3.getrowNum(), W_d3.getcolumnNum(), 0.0);
-    for (int r = 0; r < W_d3.getrowNum(); ++r) {
-        for (int c = 0; c < W_d3.getcolumnNum(); ++c) {
-            double old = W_d3.getVectorD()[c][r]; // 注意存储顺序
-            W_d3.setValue(r + 1, c + 1, old + eps);
-            Matrix recon2, mu2, logvar2;
-            forward(x, recon2, mu2, logvar2);
-            double L2 = loss(x, recon2, mu2, logvar2);
-            grad_W_d3.setValue(r + 1, c + 1, (L2 - L) / eps);
-            W_d3.setValue(r + 1, c + 1, old);
-        }
-    }
-    // 更新参数
-    for (int r = 0; r < W_d3.getrowNum(); ++r)
-        for (int c = 0; c < W_d3.getcolumnNum(); ++c) {
-            double grad = grad_W_d3.getVectorD()[c][r];
-            double new_val = W_d3.getVectorD()[c][r] - learning_rate * grad;
-            W_d3.setValue(r + 1, c + 1, new_val);
-        }
-    Matrix grad_b_d3(b_d3.getrowNum(), 1, 0.0);
-    for (int r = 0; r < b_d3.getrowNum(); ++r) {
-        double old = b_d3.getVectorD()[0][r];
-        b_d3.setValue(r + 1, 1, old + eps);
-        Matrix recon2, mu2, logvar2;
-        forward(x, recon2, mu2, logvar2);
-        double L2 = loss(x, recon2, mu2, logvar2);
-        grad_b_d3.setValue(r + 1, 1, (L2 - L) / eps);
-        b_d3.setValue(r + 1, 1, old);
-    }
-    // 更新 b_d3
-    for (int r = 0; r < b_d3.getrowNum(); ++r) {
-        double grad = grad_b_d3.getVectorD()[0][r];
-        double new_val = b_d3.getVectorD()[0][r] - learning_rate * grad;
-        b_d3.setValue(r + 1, 1, new_val);
-    }
+	//4.2 损失对解码器输入（即隐变量 z）的导数
+	Matrix dL_dzj = ;
 
-    return L;
+	// 更新权重和偏置（使用标量学习率）
+	double lr = learning_rate;
+	// 更新输出层
+	for (int r = 0; r < dW_d3.getrowNum(); r++) {
+		for (int c = 0; c < dW_d3.getcolumnNum(); c++) {
+			double grad = dW_d3.getVectorD()[c][r];  // 注意列优先索引
+			double new_w = W_d3.getVectorD()[c][r] - lr * grad;
+			W_d3.setValue(r + 1, c + 1, new_w);
+		}
+	}
+	// 更新输出层偏置
+	for (int r = 0; r < db_d3.getrowNum(); r++) {
+		double new_b = b_d3.getVectorD()[0][r] - lr * db_d3.getVectorD()[0][r];
+		b_d3.setValue(r + 1, 1, new_b);
+	}
+	// 更新输出层
+	for (int r = 0; r < dW_d2.getrowNum(); r++) {
+		for (int c = 0; c < dW_d2.getcolumnNum(); c++) {
+			double grad = dW_d2.getVectorD()[c][r];  // 注意列优先索引
+			double new_w = W_d2.getVectorD()[c][r] - lr * grad;
+			W_d2.setValue(r + 1, c + 1, new_w);
+		}
+	}
+	// 更新输出层偏置
+	for (int r = 0; r < db_d2.getrowNum(); r++) {
+		double new_b = b_d2.getVectorD()[0][r] - lr * db_d2.getVectorD()[0][r];
+		b_d2.setValue(r + 1, 1, new_b);
+	}// 更新输出层
+	for (int r = 0; r < dW_d1.getrowNum(); r++) {
+		for (int c = 0; c < dW_d1.getcolumnNum(); c++) {
+			double grad = dW_d1.getVectorD()[c][r];  // 注意列优先索引
+			double new_w = W_d1.getVectorD()[c][r] - lr * grad;
+			W_d1.setValue(r + 1, c + 1, new_w);
+		}
+	}
+	// 更新输出层偏置
+	for (int r = 0; r < db_d1.getrowNum(); r++) {
+		double new_b = b_d1.getVectorD()[0][r] - lr * db_d1.getVectorD()[0][r];
+		b_d1.setValue(r + 1, 1, new_b);
+	}
+
+
+
+
+	return L;
 }
 static void save_matrix(const Matrix& M, const std::string& num) {
 	string fileName = num;

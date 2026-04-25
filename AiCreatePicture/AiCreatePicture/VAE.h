@@ -5,7 +5,6 @@
 #include <random>
 
 
-
 class VAE {
 public:
     // 构造函数：指定输入维度、隐藏层维度、隐变量维度
@@ -26,15 +25,39 @@ public:
     double loss(const Matrix& x, const Matrix& recon, const Matrix& mu, const Matrix& logvar);
 
     // 训练一步（单样本或小批量），返回损失值
-    double train_step(const Matrix& x, double learning_rate);
+    double train_step(const pair<int, string> xOrigin, double learning_rate);
 
     // 保存/加载模型参数
     void save(const std::string& prefix) const;
     void load(const std::string& prefix);
 
+
+    vector<pair<int, string>> train_samples;  // 存储 (label, filepath)
+    void loadTrainingData(const string& folder_path) {
+        train_samples.clear();
+        for (const auto& entry : filesystem::directory_iterator(folder_path)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".txt") {
+                string filename = entry.path().filename().string();
+                //	cout << endl << "文件名：" << filename << endl;
+                // 解析文件名：格式为 "数字_编号.txt"
+                size_t underscore_pos = filename.find('_');
+                if (underscore_pos == string::npos) continue;
+                int label = stoi(filename.substr(0, underscore_pos));
+                //	cout << endl << "label：" << label << endl;
+                if (label < 0 || label > 9) continue;  // 确保标签有效
+                train_samples.push_back({ label, entry.path().string() });
+            }
+        }
+        // 打乱样本顺序（可选，用于epoch）
+        shuffle(train_samples.begin(), train_samples.end(), default_random_engine(random_device()()));
+    }
+
+
 private:
     int input_dim;
     int latent_dim;
+
+    vector<Matrix>layerNeuron;
 
     // 编码器权重和偏置（三层： input -> hidden1 -> hidden2 -> mu/logvar）
     Matrix W_e1, b_e1;   // input -> hidden1
@@ -50,7 +73,4 @@ private:
     // 辅助函数：Xavier 初始化
     void init_weights(Matrix& W, int n_in, int n_out);
     void init_bias(Matrix& b, int n_out);
-
-    // 激活函数（直接调用你已有的全局函数）
-    // sigmoid, tanh 等已在 NeuralNetwork.h 中定义
 };
