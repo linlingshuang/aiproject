@@ -188,6 +188,17 @@ inline Matrix subtraction(Matrix A, int I = 1) {
 	}
 	return C;
 }
+inline Matrix subtraction(int I,Matrix A) {
+	Matrix C = Matrix(A.getrowNum(), A.getcolumnNum());
+	for (int i = 0; i < A.getrowNum(); i++) {
+		for (int j = 0; j < A.getcolumnNum(); j++) {
+			double c = 0;
+			c += (1 - A.getVectorD()[j][i]);
+			C.setValue(i + 1, j + 1, c);
+		}
+	}
+	return C;
+}
 inline Matrix transpose(Matrix A) {
 	Matrix C = Matrix(A.getcolumnNum(), A.getrowNum());
 	for (int i = 0; i < A.getrowNum(); i++) {

@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <random>
+#include <filesystem>
 
 class VAE {
 public:
@@ -11,11 +12,11 @@ public:
     ~VAE();
 
     // 前向传播：输入 x，输出重构图像，同时返回 mu, logvar
-    void forward(const Matrix& x, Matrix& recon, Matrix& mu, Matrix& logvar);
+    void forward(const Matrix& x, Matrix& recon, Matrix& mu, Matrix& logvar, Matrix& epsilon);
 
     void encode(const Matrix& x, Matrix& mu, Matrix& logvar);
     // 重参数化采样：给定 mu, logvar，返回采样 z
-    Matrix reparameterize(const Matrix& mu, const Matrix& logvar);
+    Matrix reparameterize(const Matrix& mu, const Matrix& logvar, Matrix& epsilon);
 
     // 解码器单独前向：从 z 生成图像（用于生成阶段）
     Matrix decode(const Matrix& z);
@@ -72,4 +73,12 @@ private:
     // 辅助函数：Xavier 初始化
     void init_weights(Matrix& W, int n_in, int n_out);
     void init_bias(Matrix& b, int n_out);
+    
+    // 反向传播函数
+    void backward(const Matrix& x, const Matrix& recon, const Matrix& mu, const Matrix& logvar, const Matrix& z, const Matrix& epsilon, double learning_rate);
+    
+    // 辅助函数
+    void update_weights(Matrix& W, const Matrix& dW, double lr);
+    void update_biases(Matrix& b, const Matrix& db, double lr);
+    Matrix multiplicationScalar(const Matrix& A, double scalar);
 };

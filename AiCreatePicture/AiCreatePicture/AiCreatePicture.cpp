@@ -1,9 +1,9 @@
-﻿﻿﻿﻿#include "VAE.h"
-#include <iostream>
+﻿#include <iostream>
 #include <vector>
 #include <string>
 #include <filesystem>
 #include "lodepng.h"
+#include "VAE.h"
 
 using namespace std;
 
@@ -21,11 +21,11 @@ void save_image(const Matrix& img, const string& filename) {
 
 int main(int argc, char* argv[]) {
     const int input_dim = 32 * 32;
-    const int hidden1 = 16;
-    const int hidden2 = 8;
-    const int latent_dim = 2;
+    const int hidden1 =256;
+    const int hidden2 = 128;
+    const int latent_dim = 20;
     const double lr = 0.001;
-    const int epochs = 1;
+    const int epochs = 5;
 
     string mode = "generate";
     if (argc > 1) {
@@ -36,10 +36,14 @@ int main(int argc, char* argv[]) {
 
     if (mode == "train") {
         cout << "===== 开始训练 =====" << endl;
-        vae.loadTrainingData("E:/Code/Github/AiProject/AiCreatePicture/AiCreatePicture/trainingDigits");
+        vae.loadTrainingData("E:/Code/Github/AiProject/AiCreatePicture/AiCreatePicture/trainingDigits/7");
         for (int epoch = 0; epoch < epochs; epoch++) {
             double total_loss = 0.0;
+            shuffle(vae.train_samples.begin(), vae.train_samples.end(), default_random_engine(random_device()()));
             for (size_t i = 0; i < vae.train_samples.size(); i++) {
+                if (i % 50 == 0) {
+                    cout << "#";
+                } 
                 double loss = vae.train_step(vae.train_samples[i], lr);
                 total_loss += loss;
             }
@@ -57,10 +61,10 @@ int main(int argc, char* argv[]) {
     else if (mode == "generate") {
         cout << "===== 开始生成图片 =====" << endl;
         vae.load("vae_final");
-        random_device rd;
-        mt19937 gen(rd());
-        normal_distribution<> dist(0.0, 1.0);
         for (int i = 0; i < 10; i++) {
+            random_device rd;
+            mt19937 gen(rd());
+            normal_distribution<> dist(0.0, 1.0);
             Matrix z(latent_dim, 1);
             for (int j = 0; j < latent_dim; j++) {
                 z.setValue(j + 1, 1, dist(gen));
