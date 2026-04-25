@@ -4,7 +4,6 @@
 #include <cmath>
 #include <random>
 
-
 class VAE {
 public:
     // 构造函数：指定输入维度、隐藏层维度、隐变量维度

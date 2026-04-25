@@ -41,11 +41,11 @@ void VAE::init_bias(Matrix& b, int n_out) {
         // 或者给一个很小的正数，比如 0.01，避免 ReLU 死亡
         // b = Matrix(n_out, 1, 0.01);
 }
-void VAE::forward(const Matrix& x, Matrix& recon, Matrix& mu, Matrix& logvar) {
+void VAE::forward(const Matrix& x, Matrix& recon, Matrix& mu, Matrix& logvar, Matrix& epsilon) {
     // ---------- 编码器 ----------
 	encode(x, mu, logvar);
     // ---------- 重参数化 ----------
-    Matrix z = reparameterize(mu, logvar);
+    Matrix z = reparameterize(mu, logvar, epsilon);
 	layerNeuron[3] = z;
     // ---------- 解码器 ----------
     recon = decode(z);
@@ -62,7 +62,7 @@ void VAE::encode(const Matrix& x, Matrix& mu, Matrix& logvar) {
     mu = addition(multiplication(W_mu, h2), b_mu);
     logvar = addition(multiplication(W_logvar, h2), b_logvar);
 }
-Matrix VAE::reparameterize(const Matrix& mu, const Matrix& logvar) {
+Matrix VAE::reparameterize(const Matrix& mu, const Matrix& logvar, Matrix &epsilon) {
     // 计算标准差 sigma = exp(0.5 * logvar)
     Matrix sigma(mu.getrowNum(), 1);
     for (int i = 0; i < mu.getrowNum(); ++i) {
@@ -70,12 +70,12 @@ Matrix VAE::reparameterize(const Matrix& mu, const Matrix& logvar) {
         double s = exp(0.5 * lv);
         sigma.setValue(i + 1, 1, s);
     }
-
+	epsilon= Matrix(mu.getrowNum(), 1);
     // 生成标准正态随机数（使用静态随机数生成器）
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::normal_distribution<> dist(0.0, 1.0);
-    Matrix epsilon(mu.getrowNum(), 1);
+   
     for (int i = 0; i < mu.getrowNum(); ++i) {
         epsilon.setValue(i + 1, 1, dist(gen));
     }
@@ -140,22 +140,22 @@ double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
 	Matrix x = readTxtToMatrix(filepath);
 	layerNeuron[0] = x;
 
-	Matrix recon, mu, logvar;
-	forward(x, recon, mu, logvar);
+	Matrix recon, mu, logvar, epsilon;
+	forward(x, recon, mu, logvar, epsilon);
 	double L = loss(x, recon, mu, logvar);
 
-	//4.1 损失对解码器输出的导数
+	//1 损失对解码器输出的导数
 	Matrix dL_dpi = subtraction(divisionOneByOne(subtraction(x, 1), subtraction(recon, 1)), divisionOneByOne(x, recon));
 
 	//------//
-	// 输出层权重梯度 W_d3 = dL_dpi * deconh1^T
+	// 解码器输出层权重梯度 W_d3 = dL_dpi * deconh1^T
 	Matrix deconh1 = layerNeuron[5];  
 	Matrix dW_d3 = multiplication(dL_dpi, transpose(deconh1));
-	// 输出层偏置梯度 db_d3 = dL_dpi
+	// 解码器输出层偏置梯度 db_d3 = dL_dpi
 	Matrix db_d3 = dL_dpi;
 
 	//------//
-	// 隐藏层误差 delta_h1 = (W_d3^T * dL_dpi) ⊙ ReLU'(deconh1)
+	// 解码器隐藏层误差 delta_h1 = (W_d3^T * dL_dpi) ⊙ ReLU'(deconh1)
 	Matrix W_d3T = transpose(W_d3);  
 	Matrix delta_h1_temp = multiplication(W_d3T, dL_dpi);
 	// 计算 ReLU 导数：val > 0 ? 1 : 0
@@ -165,14 +165,14 @@ double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
 		ReLU_deriv.setValue(i + 1, 1, val > 0 ? 1 : 0);
 	}
 	Matrix delta_h1 = multiplicationOneByOne(delta_h1_temp, ReLU_deriv);  
-	// 隐藏层权重梯度 dW_d2 = delta_h1 * deconh2^T
+	// 解码器隐藏层权重梯度 dW_d2 = delta_h1 * deconh2^T
 	Matrix deconh2 = layerNeuron[4];
 	Matrix dW_d2 = multiplication(delta_h1, transpose(deconh2));
-	// 隐藏层偏置梯度 db_d2 = delta_h1
+	// 解码器隐藏层偏置梯度 db_d2 = delta_h1
 	Matrix db_d2 = delta_h1;
 
 	//------//
-	// 隐藏层误差 delta_h2 = (W_d2^T * dW_d2) ⊙ ReLU'(deconh2)
+	// 解码器隐藏层误差 delta_h2 = (W_d2^T * dW_d2) ⊙ ReLU'(deconh2)
 	Matrix W_d2T = transpose(W_d2);
 	Matrix delta_h2_temp = multiplication(W_d2T, dW_d2);
 	// 计算 ReLU 导数：val > 0 ? 1 : 0
@@ -182,18 +182,36 @@ double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
 		ReLU_deriv2.setValue(i + 1, 1, val > 0 ? 1 : 0);
 	}
 	Matrix delta_h2 = multiplicationOneByOne(delta_h2_temp, ReLU_deriv2);
-	// 隐藏层权重梯度 dW_d1 = delta_h2 * z^T
+	// 解码器隐藏层权重梯度 dW_d1 = delta_h2 * z^T
 	Matrix z = layerNeuron[3];
 	Matrix dW_d1 = multiplication(delta_h2, transpose(z));
-	// 隐藏层偏置梯度 db_d1 = delta_h2
+	// 解码器隐藏层偏置梯度 db_d1 = delta_h2
 	Matrix db_d1 = delta_h2;
 
-	//4.2 损失对解码器输入（即隐变量 z）的导数
-	Matrix dL_dzj = ;
+	//2 损失对解码器输入（即隐变量 z）的导数
+	Matrix dL_dz = multiplication(subtraction(recon, x), transpose(dW_d1));;
+
+	//3 合并编码器输出节点的梯度
+	Matrix gradmu = addition(dL_dz, mu);
+	Matrix tempSigma(logvar.getrowNum(), 1);
+	Matrix tempSigmaPow2(logvar.getrowNum(),1);
+	for (int j = 0; j < latent_dim; ++j) {
+		double logvar_j = logvar.getVectorD()[0][j];
+		double exp_logvar = exp(min(logvar_j, 20.0));
+		double sigma = sqrt(exp_logvar);
+		tempSigmaPow2.setValue(j + 1, 1, 0.5 * exp_logvar - 0.5);
+		tempSigma.setValue(j + 1, 1, sigma * 0.5);
+	}
+	Matrix gradlogvar = addition(multiplicationOneByOne(multiplicationOneByOne(dL_dz, tempSigma), epsilon), tempSigmaPow2);
+
+
+
+
+
 
 	// 更新权重和偏置（使用标量学习率）
 	double lr = learning_rate;
-	// 更新输出层
+	// 更新解码器输出层
 	for (int r = 0; r < dW_d3.getrowNum(); r++) {
 		for (int c = 0; c < dW_d3.getcolumnNum(); c++) {
 			double grad = dW_d3.getVectorD()[c][r];  // 注意列优先索引
@@ -201,12 +219,12 @@ double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
 			W_d3.setValue(r + 1, c + 1, new_w);
 		}
 	}
-	// 更新输出层偏置
+	// 更新解码器输出层偏置
 	for (int r = 0; r < db_d3.getrowNum(); r++) {
 		double new_b = b_d3.getVectorD()[0][r] - lr * db_d3.getVectorD()[0][r];
 		b_d3.setValue(r + 1, 1, new_b);
 	}
-	// 更新输出层
+	// 更新解码器隐藏层
 	for (int r = 0; r < dW_d2.getrowNum(); r++) {
 		for (int c = 0; c < dW_d2.getcolumnNum(); c++) {
 			double grad = dW_d2.getVectorD()[c][r];  // 注意列优先索引
@@ -214,11 +232,11 @@ double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
 			W_d2.setValue(r + 1, c + 1, new_w);
 		}
 	}
-	// 更新输出层偏置
+	// 更新解码器隐藏层偏置
 	for (int r = 0; r < db_d2.getrowNum(); r++) {
 		double new_b = b_d2.getVectorD()[0][r] - lr * db_d2.getVectorD()[0][r];
 		b_d2.setValue(r + 1, 1, new_b);
-	}// 更新输出层
+	}// 更新解码器隐藏层
 	for (int r = 0; r < dW_d1.getrowNum(); r++) {
 		for (int c = 0; c < dW_d1.getcolumnNum(); c++) {
 			double grad = dW_d1.getVectorD()[c][r];  // 注意列优先索引
@@ -226,7 +244,7 @@ double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
 			W_d1.setValue(r + 1, c + 1, new_w);
 		}
 	}
-	// 更新输出层偏置
+	// 更新解码器隐藏层偏置
 	for (int r = 0; r < db_d1.getrowNum(); r++) {
 		double new_b = b_d1.getVectorD()[0][r] - lr * db_d1.getVectorD()[0][r];
 		b_d1.setValue(r + 1, 1, new_b);
