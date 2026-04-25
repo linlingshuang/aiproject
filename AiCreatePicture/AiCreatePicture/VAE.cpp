@@ -132,14 +132,20 @@ double VAE::loss(const Matrix& x, const Matrix& recon, const Matrix& mu, const M
 
     return recon_loss + kl;
 }
-double VAE::train_step(const pair<int, string> xOrigin, double learning_rate) {
-	// 1. 前向：得到 recon, mu, logvar
-	int label = xOrigin.first;
-	string filepath = xOrigin.second;
-	// 读取图片数据
-	Matrix x = readTxtToMatrix(filepath);
+double VAE::train_step(const pair<int, string> xOrigin, double learning_rate, Matrix DIY) {
+	Matrix x;
+	if (xOrigin.second == "DIY") {
+		x = DIY;
+	}
+	else {
+		// 1. 前向：得到 recon, mu, logvar
+		string filepath = xOrigin.second;
+		// 读取图片数据
+		x = readTxtToMatrix(filepath);
+	}
 	layerNeuron[0] = x;
 
+	// 1. 前向：得到 recon, mu, logvar
 	Matrix recon, mu, logvar, epsilon;
 	forward(x, recon, mu, logvar, epsilon);
 	double L = loss(x, recon, mu, logvar);

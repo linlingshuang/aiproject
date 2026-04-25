@@ -25,7 +25,7 @@ public:
     double loss(const Matrix& x, const Matrix& recon, const Matrix& mu, const Matrix& logvar);
 
     // 训练一步（单样本或小批量），返回损失值
-    double train_step(const pair<int, string> xOrigin, double learning_rate);
+    double train_step(const pair<int, string> xOrigin, double learning_rate, Matrix DIY = Matrix(1,1,0));
 
     // 保存/加载模型参数
     void save(const std::string& prefix) const;
