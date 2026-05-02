@@ -20,7 +20,7 @@ void save_image(const Matrix& img, const string& filename) {
 	lodepng::encode(filename, image_data, 32, 32, LCT_GREY, 8);
 	cout << "图片已保存为 " << filename << endl;
 }
-int main(int argc, char* argv[]) {
+int main (int argc, char* argv[]) {
 
 	const int input_dim = 32 * 32;
 	const int hidden1 = 256;
@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
 			double total_loss = 0.0;
 			shuffle(vae.train_samples.begin(), vae.train_samples.end(), default_random_engine(random_device()()));
 			for (size_t i = 0; i < vae.train_samples.size(); i++) {
-				if (i % 50 == 0) {
+				if (i % 25 == 0) {
 					cout << "#";
 				}
 				double loss = vae.train_step(vae.train_samples[i], lr);
